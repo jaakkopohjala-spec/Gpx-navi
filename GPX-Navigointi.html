@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<title>GPX-navigointi</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  body { font-family: sans-serif; padding: 1rem; }
+  label { display: block; margin-top: 1rem; }
+  button { margin-top: 1rem; }
+  #status { font-size: 1.2rem; margin-top: 1.5rem; }
+</style>
+</head>
+
+<body>
+
+<h1>GPX-reittiseuranta</h1>
+
+<label>
+  Lataa GPX-tiedosto:
+  <input type="file" accept=".gpx" id="gpxFile">
+</label>
+
+<label>
+  Sallittu poikkeama (m):
+  <input type="number" id="threshold" value="15" min="5" max="100">
+</label>
+
+<label>
+  GPS-päivitysväli (sekuntia):
+  <input type="number" id="interval" value="3" min="1" max="30">
+</label>
+
+<label>
+  Puheilmoitukset:
+  <select id="speechMode">
+    <option value="off">Pois</option>
+    <option value="changes">Vain muutoksista</option>
+    <option value="all" selected>Kaikki</option>
+  </select>
+</label>
+
+<button id="toggle">Aloita seuranta</button>
+
+<div id="status" aria-live="polite">
+  Odotetaan…
+</div>
+
+<script>
+let routePoints = [];
+let watchId = null;
+let lastState = "";
+let lastUpdate = 0;
+let running = false;
+
+// -------- GPX LUKU --------
+document.getElementById("gpxFile").addEventListener("change", async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const text = await file.text();
+  const xml = new DOMParser().parseFromString(text, "application/xml");
+  const trkpts = xml.getElementsByTagName("trkpt");
+
+  routePoints = [];
+  for (let pt of trkpts) {
+    routePoints.push({
+      lat: parseFloat(pt.getAttribute("lat")),
+      lon: parseFloat(pt.getAttribute("lon"))
+    });
+  }
+
+  speak(`GPX ladattu. ${routePoints.length} pistettä.`, true);
+});
+
+// -------- TAUKO / JATKA --------
+document.getElementById("toggle").addEventListener("click", () => {
+  if (!running) startTracking();
+  else stopTracking();
+});
+
+function startTracking() {
+  if (routePoints.length === 0) {
+    alert("Lataa ensin GPX.");
+    return;
+  }
+
+  watchId = navigator.geolocation.watchPosition(
+    handlePosition,
+    err => alert("GPS-virhe: " + err.message),
+    { enableHighAccuracy: true }
+  );
+
+  running = true;
+  document.getElementById("toggle").innerText = "Tauko";
+  speak("Seuranta käynnistetty.", true);
+}
+
+function stopTracking() {
+  navigator.geolocation.clearWatch(watchId);
+  running = false;
+  document.getElementById("toggle").innerText = "Jatka";
+  speak("Seuranta tauolla.", true);
+}
+
+// -------- GPS-KÄSITTELY --------
+function handlePosition(pos) {
+  const now = Date.now();
+  const intervalMs = Number(document.getElementById("interval").value) * 1000;
+
+  if (now - lastUpdate < intervalMs) return;
+  lastUpdate = now;
+
+  const lat = pos.coords.latitude;
+  const lon = pos.coords.longitude;
+  const threshold = Number(document.getElementById("threshold").value);
+
+  let closest = null;
+  let minDist = Infinity;
+
+  for (let p of routePoints) {
+    const d = distance(lat, lon, p.lat, p.lon);
+    if (d < minDist) {
+      minDist = d;
+      closest = p;
+    }
+  }
+
+  let state, message;
+
+  if (minDist <= threshold) {
+    state = "reitillä";
+    message = `Reitillä. Poikkeama ${Math.round(minDist)} metriä.`;
+  } else {
+    state = "poissa";
+    const dir = bearingToText(lat, lon, closest.lat, closest.lon);
+    message = `Poissa reitiltä. ${Math.round(minDist)} metriä, suunta ${dir}.`;
+  }
+
+  document.getElementById("status").innerText = message;
+  maybeSpeak(state, message);
+}
+
+// -------- PUHELOGIIKKA --------
+function maybeSpeak(state, message) {
+  const mode = document.getElementById("speechMode").value;
+
+  if (mode === "off") return;
+  if (mode === "changes" && state === lastState) return;
+
+  speak(message);
+  lastState = state;
+}
+
+function speak(text, force=false) {
+  if (!window.speechSynthesis) return;
+  if (!force && document.getElementById("speechMode").value === "off") return;
+
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "fi-FI";
+  speechSynthesis.speak(u);
+}
+
+// -------- ETÄISYYS --------
+function distance(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = x => x * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+
+  const a = Math.sin(dLat/2)**2 +
+            Math.cos(toRad(lat1)) *
+            Math.cos(toRad(lat2)) *
+            Math.sin(dLon/2)**2;
+
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// -------- SUUNTA --------
+function bearingToText(lat1, lon1, lat2, lon2) {
+  const toRad = x => x * Math.PI / 180;
+  const toDeg = x => x * 180 / Math.PI;
+
+  const y = Math.sin(toRad(lon2 - lon1)) * Math.cos(toRad(lat2));
+  const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+            Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(toRad(lon2 - lon1));
+
+  let b = (toDeg(Math.atan2(y, x)) + 360) % 360;
+
+  if (b < 22.5) return "pohjoiseen";
+  if (b < 67.5) return "koilliseen";
+  if (b < 112.5) return "itään";
+  if (b < 157.5) return "kaakkoon";
+  if (b < 202.5) return "etelään";
+  if (b < 247.5) return "lounaaseen";
+  if (b < 292.5) return "länteen";
+  if (b < 337.5) return "luoteeseen";
+  return "pohjoiseen";
+}
+</script>
+
+</body>
+</html>
