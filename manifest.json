@@ -2,7 +2,7 @@
   "name": "GPX-sovellus",
   "short_name": "GPX",
   "description": "GPX-reittiseuranta, tallennin ja paikannin",
-  "start_url": "./Gpx_v1_6.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0d1117",

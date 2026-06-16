@@ -1,12 +1,10 @@
 /* GPX-sovellus – Service Worker v1.6
-   Strategia: Cache First, päivittyy taustalla.
-   Kaikki sovelluksen tiedostot välimuistitetaan ensimmäisellä latauksella,
-   jonka jälkeen sovellus toimii täysin offline-tilassa. */
+   Strategia: Cache First, päivittyy taustalla. */
 
 const CACHE_NAME = 'gpx-v1.6';
 
 const PRECACHE_URLS = [
-  './Gpx_v1_6.html',
+  './index.html',
   './manifest.json',
   './icon-192.png',
   './icon-512.png'
@@ -16,7 +14,6 @@ const PRECACHE_URLS = [
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      /* Ikonit ovat valinnaisia – jos niitä ei ole, ei kaatuile */
       return Promise.allSettled(
         PRECACHE_URLS.map(url =>
           cache.add(url).catch(() => {
@@ -43,7 +40,6 @@ self.addEventListener('activate', event => {
 
 /* ── Fetch: Cache First → Network fallback ── */
 self.addEventListener('fetch', event => {
-  /* Käsitellään vain GET-pyynnöt samasta originista */
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
@@ -52,7 +48,6 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) {
-        /* Palautetaan välimuistista; päivitetään taustalla */
         const networkFetch = fetch(event.request)
           .then(response => {
             if (response && response.status === 200) {
@@ -63,14 +58,11 @@ self.addEventListener('fetch', event => {
             }
             return response;
           })
-          .catch(() => { /* verkko ei tavoitettavissa – ei haittaa */ });
-
-        /* Ei odoteta taustapäivitystä */
+          .catch(() => {});
         void networkFetch;
         return cached;
       }
 
-      /* Ei välimuistissa – haetaan verkosta ja välimuistitetaan */
       return fetch(event.request).then(response => {
         if (!response || response.status !== 200) return response;
         const clone = response.clone();
