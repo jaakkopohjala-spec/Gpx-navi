@@ -457,7 +457,7 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
       </svg>
       <span id="plGpsLabel">Aloita</span>
     </button>
-    <button class="btn btn-blue" id="plSaveBtn" aria-label="Tallenna">
+    <button class="btn btn-blue" id="plSaveBtn" aria-label="Tallenna nykyinen sijainti">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
            stroke="currentColor" stroke-width="2.5" aria-hidden="true">
         <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0z"/>
@@ -505,16 +505,16 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
     <span id="plBannerText">GPS-seuranta ei käynnissä.</span>
   </div>
 
-  <!-- Tallennettujen paikkojen lista -->
+  <!-- Tallennettujen paikkojen lista: otsikko pidetään erillään listan aria-nimestä, jotta VoiceOver ei toista otsikkoa jokaisen kohteen yhteydessä. -->
   <h2 class="places-heading" id="plPlacesHeading">Tallennetut paikat</h2>
   <div class="vo-break" tabindex="0" role="text" aria-label=" "></div>
-  <div id="plList" class="places-list" role="list" aria-labelledby="plPlacesHeading">
+  <div id="plList" class="places-list" role="list">
     <p class="places-empty" id="plEmpty">Ei tallennettuja paikkoja.</p>
   </div>
 
-  <div class="btn-row backup-controls">
-    <button class="btn btn-blue" id="plExportBtn" aria-label="Vie">Vie</button>
-    <button class="btn btn-yellow" id="plImportBtn" aria-label="Tuo">Tuo</button>
+  <div class="btn-row backup-controls" aria-label="Paikkojen varmuuskopiointi">
+    <button class="btn btn-blue" id="plExportBtn" aria-label="Vie tallennetut paikat varmuuskopioksi">Vie</button>
+    <button class="btn btn-yellow" id="plImportBtn" aria-label="Tuo tallennetut paikat varmuuskopiosta">Tuo</button>
   </div>
   <input type="file" id="plImportFile" accept="application/json,.json" class="sr-only" aria-hidden="true" tabindex="-1">
 
@@ -788,7 +788,7 @@ function releaseWakeLock() { if(wakeLock){wakeLock.release();wakeLock=null;} }
 
 /* Shared wake lock logic: release only if neither recorder nor places GPS running */
 function maybeReleaseLock() {
-  if(!navState.running && !recIntervalId && !plState.running) releaseWakeLock();
+  if(!recIntervalId && !plState.running) releaseWakeLock();
 }
 
 document.addEventListener('visibilitychange',async()=>{
@@ -1483,15 +1483,13 @@ function plRenderList() {
     item.dataset.active = p.active ? 'true' : 'false';
     item.setAttribute('role','listitem');
 
-    const nameId = 'place-name-' + p.id;
-    const descId = 'place-desc-' + p.id;
-
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.className = 'place-item-check';
     cb.checked = !!p.active;
+    const descId = 'place-desc-' + p.id;
     cb.setAttribute('aria-label', 'Seuraa');
-    cb.setAttribute('aria-describedby', nameId + ' ' + descId);
+    cb.setAttribute('aria-describedby', descId);
     cb.addEventListener('change', () => {
       const place = plState.places.find(x => x.id === p.id);
       if (place) {
@@ -1507,7 +1505,6 @@ function plRenderList() {
 
     const nameEl = document.createElement('div');
     nameEl.className = 'place-item-name';
-    nameEl.id = nameId;
     nameEl.textContent = p.name;
 
     const distEl = document.createElement('div');
