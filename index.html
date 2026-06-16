@@ -31,9 +31,9 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
   position:sticky; top:0; z-index:10; }
 .tab-btn { flex:1; min-height:52px; background:none; border:none;
   border-bottom:3px solid transparent; color:var(--muted); font-family:inherit;
-  font-size:.78rem; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
-  cursor:pointer; display:flex; align-items:center; justify-content:center; gap:.45rem;
-  transition:color .15s,border-color .15s; padding:0 .5rem; }
+  font-size:.72rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+  cursor:pointer; display:flex; align-items:center; justify-content:center; gap:.35rem;
+  transition:color .15s,border-color .15s; padding:0 .3rem; }
 .tab-btn[aria-selected="true"] { color:var(--blue); border-bottom-color:var(--blue); }
 .tab-btn:focus-visible { outline:3px solid var(--blue); outline-offset:-3px; }
 
@@ -45,7 +45,7 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
 /* Fields */
 .field { display:flex; flex-direction:column; gap:.3rem; }
 .field label { font-size:.73rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
-.field input[type="number"], .field input[type="file"], .field select {
+.field input[type="number"], .field input[type="file"], .field input[type="text"], .field select {
   background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
   color:var(--text); font-family:inherit; font-size:1rem; padding:.6rem .9rem;
   min-height:var(--touch); width:100%; outline:none;
@@ -121,9 +121,46 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
 .btn-green  { background:var(--accent); color:#000; }
 .btn-yellow { background:var(--warn);   color:#000; }
 .btn-red    { background:var(--danger);  color:#fff; }
+.btn-blue   { background:var(--blue);   color:#000; }
 .btn-green:not(:disabled):hover  { box-shadow:0 0 18px rgba(63,185,80,.4); }
 .btn-yellow:not(:disabled):hover { box-shadow:0 0 18px rgba(210,153,34,.4); }
 .btn-red:not(:disabled):hover    { box-shadow:0 0 18px rgba(248,81,73,.4); }
+.btn-blue:not(:disabled):hover   { box-shadow:0 0 18px rgba(88,166,255,.4); }
+
+/* Inline button row for Paikat tab */
+.btn-row { display:flex; gap:.55rem; }
+.btn-row .btn { flex:1; }
+
+/* Paikat: save form */
+.save-form { background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:.9rem 1rem; display:flex; flex-direction:column;
+  gap:.6rem; }
+.save-form-title { font-size:.73rem; text-transform:uppercase; letter-spacing:.08em;
+  color:var(--blue); }
+.coord-row { display:flex; gap:.6rem; }
+.coord-row .field { flex:1; }
+.coord-row .field input { max-width:none; }
+
+/* Paikat list */
+.places-list { display:flex; flex-direction:column; gap:.5rem; }
+.place-item { background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:.75rem 1rem; display:flex;
+  align-items:center; gap:.75rem; cursor:pointer; min-height:var(--touch);
+  transition:border-color .15s; }
+.place-item[data-active="true"] { border-color:var(--accent); }
+.place-item-check { width:22px; height:22px; flex-shrink:0; accent-color:var(--accent);
+  cursor:pointer; }
+.place-item-info { flex:1; min-width:0; }
+.place-item-name { font-size:.95rem; font-weight:700; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; }
+.place-item-dist { font-size:.78rem; color:var(--muted); margin-top:.15rem; }
+.place-item-del { background:none; border:none; color:var(--muted); font-size:1.1rem;
+  cursor:pointer; padding:.3rem .5rem; border-radius:6px; flex-shrink:0;
+  transition:color .15s; }
+.place-item-del:hover { color:var(--danger); }
+.place-item-del:focus-visible { outline:3px solid var(--blue); }
+
+.places-empty { color:var(--muted); font-size:.88rem; text-align:center; padding:1rem 0; }
 
 /* Help modal */
 .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:100;
@@ -164,7 +201,7 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
   <div class="tab-bar-inner" role="tablist" aria-label="Sovelluksen välilehdet">
     <button class="tab-btn" role="tab" id="tab-nav" aria-selected="true"
             aria-controls="panel-nav" onclick="switchTab('nav')">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
            stroke="currentColor" stroke-width="2" aria-hidden="true">
         <polyline points="3 17 9 11 13 15 21 7"/>
         <polyline points="14 7 21 7 21 14"/>
@@ -173,10 +210,19 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
     </button>
     <button class="tab-btn" role="tab" id="tab-rec" aria-selected="false"
             aria-controls="panel-rec" onclick="switchTab('rec')">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
         <circle cx="12" cy="12" r="6"/>
       </svg>
       Tallennin
+    </button>
+    <button class="tab-btn" role="tab" id="tab-places" aria-selected="false"
+            aria-controls="panel-places" onclick="switchTab('places')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0z"/>
+        <circle cx="12" cy="10" r="3"/>
+      </svg>
+      Paikat
     </button>
   </div>
   <button class="help-btn" onclick="openHelp()" aria-label="Avaa käyttöohje"
@@ -271,7 +317,6 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
       <span class="stat-label">Tuleva käännös</span>
       <span class="stat-value" id="navTurn">–</span>
     </div>
-    <!-- Placeholder jotta grid ei jää tyhjäksi kun kaikki piilotettu -->
     <div class="stat" id="navDistStat">
       <span class="stat-label">Etäisyys reitiltä</span>
       <span class="stat-value yellow" id="navDist">–</span>
@@ -334,7 +379,7 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
     <label for="recInterval">GPS-päivitysväli (s)</label>
     <input type="number" id="recInterval" value="5" min="1" max="300"
            aria-describedby="recIntervalHint">
-    <span id="recIntervalHint" class="hint">Suositus: 3–10 s</span>
+    <span id="recIntervalHint" class="hint"> </span>
   </div>
 
   <div class="stats" role="region" aria-label="Tallennustilasto">
@@ -389,6 +434,73 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
   </div>
 
 </section>
+
+<!-- ══════ PAIKAT ══════ -->
+<section class="panel" id="panel-places" role="tabpanel" aria-labelledby="tab-places">
+
+  <!-- GPS-seuranta ja tallenna-painike samalla rivillä -->
+  <div class="btn-row">
+    <button class="btn btn-green" id="plGpsToggle"
+            aria-pressed="false" aria-label="Aloita GPS-seuranta">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <polygon points="5,3 19,12 5,21"/>
+      </svg>
+      <span id="plGpsLabel">Aloita</span>
+    </button>
+    <button class="btn btn-blue" id="plSaveBtn" aria-label="Tallenna nykyinen sijainti">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+        <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0z"/>
+        <circle cx="12" cy="10" r="3"/>
+      </svg>
+      Tallenna
+    </button>
+  </div>
+
+  <!-- Tallenna-lomake (aluksi piilotettu) -->
+  <div class="save-form" id="plSaveForm" style="display:none" role="region" aria-label="Tallenna paikka">
+    <span class="save-form-title">Uusi paikka</span>
+    <div class="field">
+      <label for="plName">Paikan nimi</label>
+      <input type="text" id="plName" placeholder="Kirjoita nimi…"
+             autocomplete="off" autocorrect="off" spellcheck="false">
+    </div>
+    <div class="coord-row">
+      <div class="field">
+        <label for="plLat">Pohjoiskoordinaatti</label>
+        <input type="text" id="plLat" inputmode="decimal" placeholder="60.000000">
+      </div>
+      <div class="field">
+        <label for="plLon">Itäkoordinaatti</label>
+        <input type="text" id="plLon" inputmode="decimal" placeholder="24.000000">
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-green" id="plConfirmBtn" aria-label="Vahvista ja tallenna paikka">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        OK
+      </button>
+      <button class="btn btn-red" id="plCancelBtn" aria-label="Peruuta tallentaminen">
+        Peruuta
+      </button>
+    </div>
+  </div>
+
+  <!-- Status -->
+  <div class="status-banner" data-state="idle" id="plBanner">
+    <span class="dot" aria-hidden="true"></span>
+    <span id="plBannerText">GPS-seuranta ei käynnissä.</span>
+  </div>
+
+  <!-- Tallennettujen paikkojen lista -->
+  <div id="plList" class="places-list" role="list" aria-label="Tallennetut paikat">
+    <p class="places-empty" id="plEmpty">Ei tallennettuja paikkoja.</p>
+  </div>
+
+</section>
 </main>
 
 <!-- ══════ OHJEMODAALI ══════ -->
@@ -399,7 +511,7 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
     <div id="helpBody">
 
       <h4>Yleistä</h4>
-      <p>Sovellus koostuu kahdesta välilehdestä: Seuranta ja Tallennin.
+      <p>Sovellus koostuu kolmesta välilehdestä: Seuranta, Tallennin ja Paikat.
          Kaikki toiminnot ovat käytettävissä kosketusnäytöllä sekä
          täysin näppäimistön ja ruudunlukijan avulla.
          Sovellus on testattu VoiceOverin kanssa (iOS) ja
@@ -453,6 +565,31 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
          laitteelle automaattisesti. Tallennus voidaan asettaa tauolle
          ja jatkaa myöhemmin. Sovellus varoittaa, jos sivu yritetään
          sulkea kesken tallennuksen.</p>
+      <p>Kun tallennus on käynnissä, sovellus kertoo liikkumissuuntasi
+         puheella 30 sekunnin välein (esim. "Kuljet pohjoiseen").
+         Ilmoituksen nopeus on 110 %.</p>
+
+      <h4>Paikat</h4>
+      <p>Paikat-välilehdellä voit tallentaa kiinnostavia sijainteja ja
+         seurata etäisyyttäsi niihin reaaliaikaisesti.</p>
+      <p>Paina Aloita käynnistääksesi GPS-seuranta. Paina Tallenna
+         lisätäksesi nykyisen sijainnin: lomakkeessa voit kirjoittaa
+         paikan nimen sekä muokata pohjois- ja itäkoordinaatteja
+         tarvittaessa. Koordinaatit voi myös kirjoittaa itse ilman
+         GPS-signaalia.</p>
+      <p>Tallennetut paikat listautuvat alla lähimpänä ylimpänä.
+         Listassa näkyy kunkin paikan etäisyys 5 metrin tarkkuudella
+         sekä ilmansuunta nykyiseen sijaintiin nähden
+         (esim. 35 m pohjoiseen). Paikan voi poistaa listasta
+         roskakoripainikkeesta.</p>
+      <p>Aktivoi yksi tai useampi paikka seurattavaksi valintaruudusta.
+         Jos seurattavia paikkoja on valittuna, sovellus ilmoittaa
+         puheella 20 sekunnin välein niiden etäisyyden ja suunnan
+         sekä oman liikkumissuuntasi
+         (esim. "Kotipaikka 55 m itään, Lähde 80 m etelään,
+         kuljet kaakkoon"). Puhenopeus on 110 %.</p>
+      <p>GPS-seuranta ilmoittaa liikkumissuunnan 20 sekunnin välein
+         myös silloin, kun yhtään paikkaa ei ole seurannassa.</p>
 
       <h4>Saavutettavuus</h4>
       <p>Kaikki painikkeet ja valintalaatikot ovat saavutettavissa
@@ -532,13 +669,12 @@ function formatTime(ms) {
   return (h>0?h+':':'') + String(m%60).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
 }
 function formatDist(m) { return m>=1000?(m/1000).toFixed(2)+' km':Math.round(m)+' m'; }
-function getSpeechRate() { return Math.max(0.7,Math.min(2.0,Number(speechRateInp.value)/100)); }
+function getSpeechRate() {
+  const inp = document.getElementById('speechRate');
+  return Math.max(0.7,Math.min(2.0,Number(inp ? inp.value : 110)/100));
+}
 
-/* === AUDIO: iOS-yhteensopiva alustus ===
-   Ongelma: iOS:ssa speechSynthesis ja AudioContext vaativat
-   että ne alustetaan suoraan kayttajan kosketustapahtumasta.
-   Ratkaisu: alustetaan molemmat heti sivun ensimmaisessa
-   kosketuksessa JA uudelleen aina Aloita seuranta -nappia painettaessa. */
+/* === AUDIO: iOS-yhteensopiva alustus === */
 let audioCtx = null;
 let speechReady = false;
 
@@ -549,13 +685,11 @@ function ensureAudio() {
 }
 
 function primeSpeech() {
-  // Soitetaan lähes äänetön lausuma joka "avaa" iOS:n audio-session.
-  // Asetetaan myös rate, jotta iOS ei jää oletusnopeuteen.
   if (!window.speechSynthesis || speechReady) return;
   const u = new SpeechSynthesisUtterance(' ');
   u.volume = 0;
   u.lang = 'fi-FI';
-  u.rate = getSpeechRate ? getSpeechRate() : 1.1;
+  u.rate = 1.1;
   speechSynthesis.speak(u);
   speechReady = true;
 }
@@ -592,7 +726,6 @@ function playOffRouteChime() {
       osc.stop(start + dur + 0.04);
     }
 
-    // Pehmeä kaksiosainen kilahdus: huomiota herättävä, mutta ei terävä.
     tone(880, t, 0.24, 0.42);
     tone(1320, t + 0.03, 0.18, 0.22);
     tone(660, t + 0.18, 0.28, 0.24);
@@ -631,10 +764,25 @@ async function acquireWakeLock() {
   } catch(e){}
 }
 function releaseWakeLock() { if(wakeLock){wakeLock.release();wakeLock=null;} }
+
+/* Shared wake lock logic: release only if neither recorder nor places GPS running */
+function maybeReleaseLock() {
+  if(!recIntervalId && !plState.running) releaseWakeLock();
+}
+
 document.addEventListener('visibilitychange',async()=>{
-  if(document.visibilityState==='visible'&&(navState.running||recIntervalId!==null)&&!wakeLock)
+  if(document.visibilityState==='visible'&&(navState.running||recIntervalId!==null||plState.running)&&!wakeLock)
     await acquireWakeLock();
 });
+
+/* === Generic speak helper (used by Paikat and Tallennin direction) === */
+function speakAt110(text) {
+  if (!window.speechSynthesis || !text) return;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'fi-FI';
+  u.rate = 1.1;
+  speechSynthesis.speak(u);
+}
 
 /* =====================================================
    SEURANTA
@@ -644,6 +792,7 @@ const navState = {
   lastUpdate:0, lastOnRoute:null,
   lastRouteSoundTime:0, lastOffRouteSoundTime:0,
   lastTurnMsg:'', lastAnnouncedTurnIdx:-1,
+  lastForward:null,
   lastRouteAxis:'', lastUserDir:'',
   routePoints:[],
   speechQueue:[], speaking:false,
@@ -675,7 +824,6 @@ const navBannerTxt    = document.getElementById('navBannerText');
 const navToggleBtn    = document.getElementById('navToggle');
 const navToggleLbl    = document.getElementById('navToggleLabel');
 
-// Checkboxien näkyvyys
 showRouteDirCb.addEventListener('change',()=>{ routeDirStat.style.display=showRouteDirCb.checked?'':'none'; });
 showUserDirCb.addEventListener('change',()=>{ userDirStat.style.display=showUserDirCb.checked?'':'none'; });
 announceTurnsCb.addEventListener('change',()=>{
@@ -683,7 +831,6 @@ announceTurnsCb.addEventListener('change',()=>{
   if(!announceTurnsCb.checked) navTurnEl.textContent='–';
 });
 
-// GPX-lataus
 gpxFileInput.addEventListener('change',async e=>{
   const file=e.target.files[0]; if(!file) return;
   try {
@@ -765,7 +912,6 @@ function maybeRouteAudio(isOnRoute, distanceText, directionText) {
   navState.lastOnRoute = isOnRoute;
 }
 
-/* Kulmamuutos -180..+180 */
 function angleDiff(from,to) {
   let d=(to-from+360)%360; if(d>180)d-=360; return d;
 }
@@ -853,7 +999,6 @@ function detectTurn(closestIdx,forward) {
       const toB=bearingDeg(pts[i-1].lat,pts[i-1].lon,pts[i-2].lat,pts[i-2].lon);
       const diff=angleDiff(fromB,toB), abs=Math.abs(diff);
       if(abs<20) continue;
-      // Merkki kaarnetaan: eteenpain oikea = taakspain vasen
       const side=diff>0?'vasemmalle':'oikealle';
       return {msg:(abs<=60?'K\u00e4\u00e4ntyy ':'K\u00e4\u00e4ntyy jyrkk\u00e4sti ')+side, turnIdx:i-1};
     }
@@ -882,7 +1027,6 @@ function handleNavPosition(pos) {
   navDistDetailEl.textContent=distStr;
   navDistEl.className='stat-value '+(onRoute?'green':'yellow');
 
-  // Reitin kulkusuunta tallennussuunnasta riippumattomana akselina
   if(showRouteDirCb.checked){
     const routeAxis = routeAxisAround(closestIdx);
     navRouteDirEl.textContent = routeAxis || '–';
@@ -892,7 +1036,6 @@ function handleNavPosition(pos) {
     }
   }
 
-  // Oma liikkumissuunta
   if(showUserDirCb.checked){
     const userDir=(heading!=null&&!isNaN(heading))?degToText(heading):null;
     navUserDirEl.textContent=userDir||'–';
@@ -902,12 +1045,17 @@ function handleNavPosition(pos) {
     }
   }
 
-  // Kaannokset
   if(announceTurnsCb.checked){
     if(heading==null||isNaN(heading)){
       navTurnEl.textContent='–';
     } else {
       const forward=isForwardDirection(heading,closestIdx);
+      if(navState.lastForward!==null && navState.lastForward!==forward){
+        navState.lastAnnouncedTurnIdx=-1;
+        navState.lastTurnMsg='';
+      }
+      navState.lastForward=forward;
+
       const turn=detectTurn(closestIdx,forward);
       if(turn){
         navTurnEl.textContent=turn.msg;
@@ -955,12 +1103,13 @@ async function navStart(){
   navState.lastOffRouteSoundTime=0;
   navState.lastTurnMsg='';
   navState.lastAnnouncedTurnIdx=-1;
+  navState.lastForward=null;
   navState.lastRouteAxis='';
   navState.lastUserDir='';
   navState.speechQueue=[];
   navState.speaking=false;
   navState.running=true;
-  warmUpAudio();   // Alustaa AudioContextin ja prime speech synthesis
+  warmUpAudio();
   navState.watchId=navigator.geolocation.watchPosition(
     handleNavPosition,
     err=>{navSetBanner('GPS-virhe: '+err.message,'error');announce('GPS-virhe.');},
@@ -997,6 +1146,7 @@ function navStop(){
 let recIntervalId=null,recTrackPoints=[],recIsPaused=false;
 let recStartTime=null,recElapsedMs=0,recTimerHandle=null;
 let recTotalDist=0,recLastCoord=null;
+let recDirIntervalId=null; // 30s liikkumissuunta-intervalli
 
 const recIntervalInp=document.getElementById('recInterval');
 const recPointsEl=document.getElementById('recPoints');
@@ -1010,6 +1160,8 @@ const recStartBtn=document.getElementById('recStartBtn');
 const recPauseBtn=document.getElementById('recPauseBtn');
 const recStopBtn=document.getElementById('recStopBtn');
 const recPauseLbl=document.getElementById('recPauseLabel');
+
+let recLastHeading=null; // päivittyy GPS-päivityksissä
 
 function recSetStatus(msg,state){
   recBannerTxt.textContent=msg; recBannerEl.dataset.state=state||'idle'; announce(msg);
@@ -1025,7 +1177,7 @@ function recFetchPoint(){
   if(recIsPaused) return;
   navigator.geolocation.getCurrentPosition(
     pos=>{
-      const{latitude:lat,longitude:lon,altitude,accuracy}=pos.coords;
+      const{latitude:lat,longitude:lon,altitude,accuracy,heading}=pos.coords;
       const time=new Date().toISOString();
       recTrackPoints.push({lat,lon,altitude,time});
       recPointsEl.textContent=recTrackPoints.length;
@@ -1035,15 +1187,23 @@ function recFetchPoint(){
       recAltEl.textContent=altitude!=null?Math.round(altitude)+' m':'–';
       recCoordsEl.textContent='Lat: '+lat.toFixed(6)+'  Lon: '+lon.toFixed(6)
         +(accuracy?' \u00b1'+Math.round(accuracy)+' m':'');
+      if(heading!=null&&!isNaN(heading)) recLastHeading=heading;
     },
     err=>recSetStatus('Paikannusvirhe: '+err.message,'error'),
     {enableHighAccuracy:true,maximumAge:0,timeout:15000}
   );
 }
 
+function recSpeakDirection(){
+  if(recIsPaused) return;
+  if(recLastHeading!=null){
+    speakAt110('Kuljet '+degToText(recLastHeading));
+  }
+}
+
 recStartBtn.addEventListener('click',async()=>{
   if(!navigator.geolocation){recSetStatus('Paikannusta ei tueta.','error');return;}
-  recTrackPoints=[];recTotalDist=0;recLastCoord=null;
+  recTrackPoints=[];recTotalDist=0;recLastCoord=null;recLastHeading=null;
   recElapsedMs=0;recIsPaused=false;
   recPointsEl.textContent='0';recDistEl.textContent='0 m';
   recTimeEl.textContent='00:00';recAltEl.textContent='–';
@@ -1051,6 +1211,8 @@ recStartBtn.addEventListener('click',async()=>{
   await acquireWakeLock();
   recFetchPoint();
   recIntervalId=setInterval(recFetchPoint,Math.max(1,Number(recIntervalInp.value))*1000);
+  // Liikkumissuunta-ilmoitus 30 sekunnin välein
+  recDirIntervalId=setInterval(recSpeakDirection, 30000);
   recStartTimer();
   recStartBtn.disabled=true;recPauseBtn.disabled=false;
   recStopBtn.disabled=false;recIntervalInp.disabled=true;
@@ -1077,8 +1239,9 @@ recPauseBtn.addEventListener('click',()=>{
 recStopBtn.addEventListener('click',()=>{
   clearInterval(recIntervalId);recIntervalId=null;
   clearInterval(recTimerHandle);recTimerHandle=null;
+  clearInterval(recDirIntervalId);recDirIntervalId=null;
   if(!recIsPaused) recElapsedMs+=Date.now()-recStartTime;
-  releaseWakeLock();
+  maybeReleaseLock();
   recStartBtn.disabled=false;recPauseBtn.disabled=true;
   recStopBtn.disabled=true;recIntervalInp.disabled=false;
   recIsPaused=false;recPauseLbl.textContent='Tauko';
@@ -1118,6 +1281,231 @@ function downloadGPX(content){
   setTimeout(()=>URL.revokeObjectURL(url),5000);
 }
 
+/* =====================================================
+   PAIKAT
+   ===================================================== */
+const plState = {
+  running: false,
+  watchId: null,
+  currentLat: null,
+  currentLon: null,
+  currentHeading: null,
+  places: [],       // [{id, name, lat, lon, active}]
+  nextId: 1,
+  lastAnnounceTime: 0
+};
+
+const plGpsToggle  = document.getElementById('plGpsToggle');
+const plGpsLabel   = document.getElementById('plGpsLabel');
+const plSaveBtn    = document.getElementById('plSaveBtn');
+const plSaveForm   = document.getElementById('plSaveForm');
+const plNameInp    = document.getElementById('plName');
+const plLatInp     = document.getElementById('plLat');
+const plLonInp     = document.getElementById('plLon');
+const plConfirmBtn = document.getElementById('plConfirmBtn');
+const plCancelBtn  = document.getElementById('plCancelBtn');
+const plBannerEl   = document.getElementById('plBanner');
+const plBannerTxt  = document.getElementById('plBannerText');
+const plListEl     = document.getElementById('plList');
+const plEmptyEl    = document.getElementById('plEmpty');
+
+function plSetBanner(msg, state) {
+  plBannerTxt.textContent = msg;
+  plBannerEl.dataset.state = state || 'idle';
+}
+
+/* Round distance to nearest 5 m */
+function roundTo5(m) { return Math.round(m / 5) * 5; }
+
+function plFormatDist(m) {
+  const r = roundTo5(m);
+  return r >= 1000 ? (r/1000).toFixed(1)+' km' : r+' m';
+}
+
+function plRenderList() {
+  const lat = plState.currentLat;
+  const lon = plState.currentLon;
+
+  // Sort by distance (ascending), unknown distance last
+  const withDist = plState.places.map(p => {
+    const d = (lat != null && lon != null)
+      ? haversine(lat, lon, p.lat, p.lon) : null;
+    const dir = (d != null && d > 0)
+      ? degToText(bearingDeg(lat, lon, p.lat, p.lon)) : null;
+    return { ...p, d, dir };
+  }).sort((a,b) => {
+    if(a.d == null && b.d == null) return 0;
+    if(a.d == null) return 1;
+    if(b.d == null) return -1;
+    return a.d - b.d;
+  });
+
+  // Remove existing items (keep empty message node)
+  [...plListEl.querySelectorAll('.place-item')].forEach(el => el.remove());
+
+  if (!withDist.length) {
+    plEmptyEl.style.display = '';
+    return;
+  }
+  plEmptyEl.style.display = 'none';
+
+  for (const p of withDist) {
+    const distLabel = p.d != null
+      ? plFormatDist(p.d) + (p.dir ? ' ' + p.dir : '')
+      : 'etäisyys tuntematon';
+
+    const item = document.createElement('div');
+    item.className = 'place-item';
+    item.dataset.active = p.active ? 'true' : 'false';
+    item.setAttribute('role','listitem');
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'place-item-check';
+    cb.checked = !!p.active;
+    cb.setAttribute('aria-label', (p.active ? 'Poista seurannasta: ' : 'Lisää seurantaan: ') + p.name);
+    cb.addEventListener('change', () => {
+      const place = plState.places.find(x => x.id === p.id);
+      if (place) { place.active = cb.checked; plRenderList(); }
+    });
+
+    const info = document.createElement('div');
+    info.className = 'place-item-info';
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'place-item-name';
+    nameEl.textContent = p.name;
+
+    const distEl = document.createElement('div');
+    distEl.className = 'place-item-dist';
+    distEl.textContent = distLabel;
+
+    info.appendChild(nameEl);
+    info.appendChild(distEl);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'place-item-del';
+    delBtn.setAttribute('aria-label', 'Poista paikka: ' + p.name);
+    delBtn.innerHTML = '&#128465;';
+    delBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      plState.places = plState.places.filter(x => x.id !== p.id);
+      announce(p.name + ' poistettu.');
+      plRenderList();
+    });
+
+    item.appendChild(cb);
+    item.appendChild(info);
+    item.appendChild(delBtn);
+    plListEl.appendChild(item);
+  }
+}
+
+/* GPS watch callback for Paikat */
+function plHandlePosition(pos) {
+  const { latitude: lat, longitude: lon, heading } = pos.coords;
+  plState.currentLat = lat;
+  plState.currentLon = lon;
+  if (heading != null && !isNaN(heading)) plState.currentHeading = heading;
+  plRenderList();
+  plMaybeAnnounce();
+}
+
+/* Periodic announcement: active places + user direction */
+function plMaybeAnnounce() {
+  const now = Date.now();
+  if (now - plState.lastAnnounceTime < 20000) return;
+  plState.lastAnnounceTime = now;
+
+  const lat = plState.currentLat;
+  const lon = plState.currentLon;
+  if (lat == null || lon == null) return;
+
+  const active = plState.places.filter(p => p.active);
+  let parts = [];
+
+  if (active.length) {
+    for (const p of active) {
+      const d = haversine(lat, lon, p.lat, p.lon);
+      const dir = degToText(bearingDeg(lat, lon, p.lat, p.lon));
+      parts.push(p.name + ' ' + plFormatDist(d) + ' ' + dir);
+    }
+  }
+
+  // Always add user direction if heading known
+  if (plState.currentHeading != null) {
+    parts.push('kuljet ' + degToText(plState.currentHeading));
+  }
+
+  if (parts.length) {
+    speakAt110(parts.join(', '));
+    announce(parts.join(', '));
+  }
+}
+
+plGpsToggle.addEventListener('click', async () => {
+  warmUpAudio();
+  if (!plState.running) {
+    if (!navigator.geolocation) {
+      plSetBanner('Paikannusta ei tueta.', 'error');
+      announce('Paikannusta ei tueta.'); return;
+    }
+    plState.running = true;
+    plState.lastAnnounceTime = 0;
+    plState.watchId = navigator.geolocation.watchPosition(
+      plHandlePosition,
+      err => { plSetBanner('GPS-virhe: ' + err.message, 'error'); announce('GPS-virhe.'); },
+      { enableHighAccuracy: true, maximumAge: 0 }
+    );
+    await acquireWakeLock();
+    plGpsLabel.textContent = 'Lopeta';
+    plGpsToggle.className = 'btn btn-red';
+    plGpsToggle.setAttribute('aria-pressed', 'true');
+    plGpsToggle.setAttribute('aria-label', 'Lopeta GPS-seuranta');
+    plSetBanner('GPS-seuranta käynnissä.', 'running');
+    announce('GPS-seuranta käynnistetty.');
+  } else {
+    navigator.geolocation.clearWatch(plState.watchId);
+    plState.running = false;
+    maybeReleaseLock();
+    plGpsLabel.textContent = 'Aloita';
+    plGpsToggle.className = 'btn btn-green';
+    plGpsToggle.setAttribute('aria-pressed', 'false');
+    plGpsToggle.setAttribute('aria-label', 'Aloita GPS-seuranta');
+    plSetBanner('GPS-seuranta pysäytetty.', 'idle');
+    announce('GPS-seuranta pysäytetty.');
+  }
+});
+
+/* Open save form */
+plSaveBtn.addEventListener('click', () => {
+  warmUpAudio();
+  plNameInp.value = '';
+  plLatInp.value = plState.currentLat != null ? plState.currentLat.toFixed(6) : '';
+  plLonInp.value = plState.currentLon != null ? plState.currentLon.toFixed(6) : '';
+  plSaveForm.style.display = '';
+  plNameInp.focus();
+});
+
+plCancelBtn.addEventListener('click', () => {
+  plSaveForm.style.display = 'none';
+});
+
+plConfirmBtn.addEventListener('click', () => {
+  const name = plNameInp.value.trim();
+  if (!name) { plNameInp.focus(); announce('Kirjoita paikan nimi.'); return; }
+  const lat = parseFloat(plLatInp.value);
+  const lon = parseFloat(plLonInp.value);
+  if (isNaN(lat) || isNaN(lon)) { announce('Tarkista koordinaatit.'); return; }
+  plState.places.push({ id: plState.nextId++, name, lat, lon, active: false });
+  plSaveForm.style.display = 'none';
+  announce(name + ' tallennettu.');
+  plRenderList();
+});
+
+/* =====================================================
+   BEFOREUNLOAD
+   ===================================================== */
 window.addEventListener('beforeunload',e=>{
   if((recTrackPoints.length&&!recStopBtn.disabled)||navState.running)
     {e.preventDefault();e.returnValue='';}
