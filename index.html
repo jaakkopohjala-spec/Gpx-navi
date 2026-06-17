@@ -505,7 +505,7 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
     <span id="plBannerText">GPS-seuranta ei käynnissä.</span>
   </div>
 
-  <!-- Tallennettujen paikkojen lista: otsikko pidetään erillään listan aria-nimestä, jotta VoiceOver ei toista otsikkoa jokaisen kohteen yhteydessä. -->
+  <!-- Tallennettujen paikkojen lista -->
   <h2 class="places-heading" id="plPlacesHeading">Tallennetut paikat</h2>
   <div class="vo-break" tabindex="0" role="text" aria-label=" "></div>
   <div id="plList" class="places-list" role="list">
@@ -603,12 +603,20 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
       <p>Sovellus muistaa tallennetut paikat laitteen selaimessa. Vie-painike
          lataa paikat JSON-varmuuskopioksi ja Tuo-painike palauttaa paikat
          aiemmin viedystä varmuuskopiotiedostosta.</p>
+      <p>Paikat-välilehden GPS-seuranta käsittelee tarkan sijainnin noin
+         4 sekunnin välein. Sijainti päivittyy myös silloin, kun yhtään
+         paikkaa ei ole valittu seurattavaksi.</p>
       <p>Aktivoi yksi tai useampi paikka seurattavaksi valintaruudusta.
          Jos seurattavia paikkoja on valittuna, sovellus ilmoittaa
          puheella 20 sekunnin välein niiden etäisyyden ja suunnan
          sekä oman liikkumissuuntasi
          (esim. "Kotipaikka 55 m itään, Lähde 80 m etelään,
          kuljet kaakkoon"). Puhenopeus on 110 %.</p>
+      <p>Kun saavut seurattavan paikan 20 metrin etäisyydelle, sovellus
+         lausuu paikan nimen ja senhetkisen etäisyyden. Ilmoitus annetaan
+         vain kerran, ja se aktivoituu uudelleen vasta, kun olet ensin
+         poistunut yli 20 metrin päähän ja palaat sen jälkeen uudelleen
+         20 metrin alueelle.</p>
       <p>GPS-seuranta ilmoittaa liikkumissuunnan 20 sekunnin välein
          myös silloin, kun yhtään paikkaa ei ole seurannassa.</p>
 
@@ -1306,6 +1314,9 @@ function downloadGPX(content){
    PAIKAT
    ===================================================== */
 const PL_STORAGE_KEY = 'gpx_sovellus_paikat_v1';
+const PL_UPDATE_INTERVAL_MS = 4000;
+const PL_NEAR_ALERT_METERS = 20;
+const plGeoOptions = { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 };
 
 const plState = {
   running: false,
@@ -1316,7 +1327,9 @@ const plState = {
   places: [],       // [{id, name, lat, lon, active}]
   nextId: 1,
   editingId: null,
-  lastAnnounceTime: 0
+  lastAnnounceTime: 0,
+  lastPositionUpdate: 0,
+  nearAlertInside: {}
 };
 
 const plGpsToggle  = document.getElementById('plGpsToggle');
@@ -1416,6 +1429,7 @@ function plImportBackupText(text) {
   plState.places = clean;
   plState.nextId = clean.length + 1;
   plState.editingId = null;
+  plState.nearAlertInside = {};
   plSaveToStorage();
   plRenderList();
   announce(clean.length + ' paikkaa tuotu.');
@@ -1494,6 +1508,7 @@ function plRenderList() {
       const place = plState.places.find(x => x.id === p.id);
       if (place) {
         place.active = cb.checked;
+        plState.nearAlertInside[place.id] = false;
         plSaveToStorage();
         announce((place.active ? 'Seurataan paikkaa ' : 'Ei seurata paikkaa ') + place.name + '.');
         plRenderList();
@@ -1534,6 +1549,7 @@ function plRenderList() {
     delBtn.addEventListener('click', e => {
       e.stopPropagation();
       plState.places = plState.places.filter(x => x.id !== p.id);
+      delete plState.nearAlertInside[p.id];
       plSaveToStorage();
       announce(p.name + ' poistettu.');
       plRenderList();
@@ -1547,13 +1563,55 @@ function plRenderList() {
   }
 }
 
+function plCheckNearAlerts() {
+  const lat = plState.currentLat;
+  const lon = plState.currentLon;
+  if (lat == null || lon == null) return;
+
+  const alertParts = [];
+  const activeIds = new Set();
+
+  for (const p of plState.places) {
+    if (!p.active) {
+      plState.nearAlertInside[p.id] = false;
+      continue;
+    }
+
+    activeIds.add(String(p.id));
+    const d = haversine(lat, lon, p.lat, p.lon);
+    const insideNow = d <= PL_NEAR_ALERT_METERS;
+    const wasInside = !!plState.nearAlertInside[p.id];
+
+    if (insideNow && !wasInside) {
+      alertParts.push(p.name + ' ' + plFormatDist(d));
+    }
+
+    plState.nearAlertInside[p.id] = insideNow;
+  }
+
+  for (const id of Object.keys(plState.nearAlertInside)) {
+    if (!activeIds.has(id)) delete plState.nearAlertInside[id];
+  }
+
+  if (alertParts.length) {
+    const msg = alertParts.join(', ');
+    speakAt110(msg);
+    announce(msg);
+  }
+}
+
 /* GPS watch callback for Paikat */
 function plHandlePosition(pos) {
+  const now = Date.now();
+  if (now - plState.lastPositionUpdate < PL_UPDATE_INTERVAL_MS) return;
+  plState.lastPositionUpdate = now;
+
   const { latitude: lat, longitude: lon, heading } = pos.coords;
   plState.currentLat = lat;
   plState.currentLon = lon;
   if (heading != null && !isNaN(heading)) plState.currentHeading = heading;
   plRenderList();
+  plCheckNearAlerts();
   plMaybeAnnounce();
 }
 
@@ -1598,10 +1656,12 @@ plGpsToggle.addEventListener('click', async () => {
     }
     plState.running = true;
     plState.lastAnnounceTime = 0;
+    plState.lastPositionUpdate = 0;
+    plState.nearAlertInside = {};
     plState.watchId = navigator.geolocation.watchPosition(
       plHandlePosition,
       err => { plSetBanner('GPS-virhe: ' + err.message, 'error'); announce('GPS-virhe.'); },
-      { enableHighAccuracy: true, maximumAge: 0 }
+      plGeoOptions
     );
     await acquireWakeLock();
     plGpsLabel.textContent = 'Lopeta';
@@ -1647,6 +1707,7 @@ plConfirmBtn.addEventListener('click', () => {
       place.name = name;
       place.lat = lat;
       place.lon = lon;
+      plState.nearAlertInside[place.id] = false;
       announce(name + ' päivitetty.');
     }
   } else {
