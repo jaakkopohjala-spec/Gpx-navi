@@ -560,6 +560,10 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
     Lähin vesistö näytetään seurannan aikana, jos Vesistöt on valittu.
   </div>
 
+  <div class="info-box" id="mdOwnPlaceStatus" aria-label="Lähin oma paikka" role="status" aria-live="off">
+    Lähin oma paikka näytetään seurannan aikana.
+  </div>
+
   <div class="stats" role="region" aria-label="Karttadatan tiedot">
     <div class="stat">
       <span class="stat-label">Tiet ja polut</span>
@@ -580,6 +584,10 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
     <div class="stat">
       <span class="stat-label">Lähin vesistö</span>
       <span class="stat-value" id="mdWaterDist">–</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Lähin oma paikka</span>
+      <span class="stat-value" id="mdOwnPlaceDist">–</span>
     </div>
     <div class="stat" id="mdRouteDirStat" style="display:none">
       <span class="stat-label">Reitin suunta</span>
@@ -1455,6 +1463,8 @@ const mdRouteDirStat = document.getElementById('mdRouteDirStat');
 const mdUserDirStat = document.getElementById('mdUserDirStat');
 const mdRouteDirEl = document.getElementById('mdRouteDir');
 const mdUserDirEl = document.getElementById('mdUserDir');
+const mdOwnPlaceStatus = document.getElementById('mdOwnPlaceStatus');
+const mdOwnPlaceDist = document.getElementById('mdOwnPlaceDist');
 
 function mdSetBanner(msg, state) {
   mdBannerText.textContent = msg;
@@ -1636,6 +1646,8 @@ function mdClearData() {
   mdWaterDist.textContent = '–';
   mdSetRoadBox('Karttadata tyhjennetty.', '');
   mdSetWaterBox('Karttadata tyhjennetty.', '');
+  if (mdOwnPlaceStatus) mdOwnPlaceStatus.textContent = 'Ei omia paikkoja tallennettuna.';
+  if (mdOwnPlaceDist) mdOwnPlaceDist.textContent = '–';
   mdSetBanner('Karttadata tyhjennetty.', 'idle');
   mdRenderOwnPlaces();
   announce('Karttadata tyhjennetty.');
@@ -2027,6 +2039,33 @@ function mdMaybeOwnPlaceAnnouncements(lat, lon) {
   }
 }
 
+function mdHandleOwnPlaceDisplay(lat, lon) {
+  if (!mdState.ownPlaces.length) {
+    if (mdOwnPlaceStatus) mdOwnPlaceStatus.textContent = 'Ei omia paikkoja tallennettuna.';
+    if (mdOwnPlaceDist) mdOwnPlaceDist.textContent = '–';
+    return;
+  }
+  let bestDist = Infinity;
+  let bestPlace = null;
+  for (const p of mdState.ownPlaces) {
+    const d = haversine(lat, lon, p.lat, p.lon);
+    if (d < bestDist) { bestDist = d; bestPlace = p; }
+  }
+  if (!bestPlace) {
+    if (mdOwnPlaceStatus) mdOwnPlaceStatus.textContent = 'Ei omia paikkoja.';
+    if (mdOwnPlaceDist) mdOwnPlaceDist.textContent = '–';
+    return;
+  }
+  const dir = degToText(bearingDeg(lat, lon, bestPlace.lat, bestPlace.lon));
+  const distText = bestDist >= 1000 ? (bestDist/1000).toFixed(1) + ' km' : Math.round(bestDist) + ' m';
+  if (mdOwnPlaceDist) {
+    mdOwnPlaceDist.textContent = bestPlace.name + ' ' + distText + ' ' + dir;
+  }
+  if (mdOwnPlaceStatus) {
+    mdOwnPlaceStatus.textContent = 'Lähin oma paikka: ' + bestPlace.name + ', ' + distText + ' ' + dir + '.';
+  }
+}
+
 function mdHandleRoads(lat, lon) {
   if (!mdRoadsCb.checked) {
     mdSetRoadBox('Teiden ja polkujen ilmoitukset pois käytöstä.', '');
@@ -2071,6 +2110,27 @@ function mdHandleRoads(lat, lon) {
   if (onRoad) mdMaybeCrossingAnnouncement(lat, lon, nearest);
 }
 
+function mdMaybeWaterProximityAnnouncement(lat, lon) {
+  // Ilmoittaa lähestyvästä vesistöstä 15 m päässä (kuten risteys/oma paikka)
+  if (!mdWaterCb.checked) return;
+  const nearest = mdNearestFeature(mdState.waters, lat, lon);
+  if (!nearest) return;
+  const d = nearest.distance;
+  if (d > 15) {
+    // Poistu alueelta — nollaa tunniste
+    delete mdState.waterProximityInside;
+    return;
+  }
+  const featureId = nearest.feature.id;
+  if (mdState.waterProximityInside === featureId) return; // jo ilmoitettu
+  const featureName = mdFeatureName(nearest.feature);
+  const dir = degToText(bearingDeg(lat, lon, nearest.closestLat, nearest.closestLon));
+  const distText = Math.round(d) + ' m';
+  mdSpeak(featureName + ' ' + distText + ' ' + dir);
+  announce(featureName + ' ' + distText + ' ' + dir);
+  mdState.waterProximityInside = featureId;
+}
+
 function mdHandleWaters(lat, lon) {
   if (!mdWaterCb.checked) {
     mdSetWaterBox('Vesistöjen ilmoitukset pois käytöstä.', '');
@@ -2088,13 +2148,8 @@ function mdHandleWaters(lat, lon) {
   const dir = degToText(bearingDeg(lat, lon, nearest.closestLat, nearest.closestLon));
   mdWaterDist.textContent = distText;
   mdSetWaterBox('Lähin vesistö: ' + featureName + ', ' + distText + ' ' + dir + '.', '');
-
-  const now = Date.now();
-  if (now - mdState.lastWaterAnnounceTime >= MD_ANNOUNCE_INTERVAL_MS || mdState.lastWaterFeatureId !== nearest.feature.id) {
-    mdSpeak(featureName + ' ' + distText + ' ' + dir);
-    mdState.lastWaterAnnounceTime = now;
-    mdState.lastWaterFeatureId = nearest.feature.id;
-  }
+  // Puheilmoitus annetaan mdMaybeCrossingAnnouncement-funktiossa 15 m säteellä (risteytyminen).
+  // Tästä funktiosta poistettu jatkuva aikaväli-ilmoitus — vesistö puhutaan vain risteytyessä.
 }
 
 function mdHandleUserDirection() {
@@ -2119,8 +2174,10 @@ function mdHandlePosition(pos) {
 
   mdHandleRoads(lat, lon);
   mdHandleWaters(lat, lon);
+  mdMaybeWaterProximityAnnouncement(lat, lon);
   mdHandleUserDirection();
   mdMaybeOwnPlaceAnnouncements(lat, lon);
+  mdHandleOwnPlaceDisplay(lat, lon);
   mdRenderOwnPlaces();
 }
 
@@ -2172,6 +2229,8 @@ mdGpsToggle.addEventListener('click', async () => {
     mdState.lastUserDir = '';
     mdState.lastWaterAnnounceTime = 0;
     mdState.crossingInside = {};
+    mdState.ownPlaceInside = {};
+    delete mdState.waterProximityInside;
     mdState.watchId = navigator.geolocation.watchPosition(
       mdHandlePosition,
       err => { mdSetBanner('GPS-virhe: ' + err.message, 'error'); announce('GPS-virhe.'); },
