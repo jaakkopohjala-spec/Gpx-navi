@@ -242,7 +242,7 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
         <line x1="9" y1="3" x2="9" y2="18"/>
         <line x1="15" y1="6" x2="15" y2="21"/>
       </svg>
-      Maastodata
+      Maasto
     </button>
   </div>
   <button class="help-btn" onclick="openHelp()" aria-label="Avaa käyttöohje"
@@ -534,8 +534,8 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
 <section class="panel" id="panel-map" role="tabpanel" aria-labelledby="tab-map">
 
   <div class="btn-row">
-    <button class="btn btn-blue" id="mdLoadBtn" aria-label="Lataa lähialueen karttadata">
-      Lataa lähialue
+    <button class="btn btn-blue" id="mdLoadCurrentBtn" aria-label="Lataa nykysijainnista">
+      Lataa nykysijainnista
     </button>
     <button class="btn btn-green" id="mdGpsToggle"
             aria-pressed="false" aria-label="Aloita maastodatan GPS-seuranta">
@@ -543,9 +543,37 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
     </button>
   </div>
 
-  <div class="hint">Lataa OSM-karttadata 2 km säteeltä nykyisestä sijainnista. Data sisältää tiet, polut ja vesistöt ja tallentuu tähän selaimeen.</div>
+  <div class="save-form" role="region" aria-label="Lataa karttadata koordinaattien perusteella">
+    <span class="save-form-title">Lataa koordinaattien perusteella</span>
+    <div class="coord-row">
+      <div class="field">
+        <label for="mdLatInput">Pohjoiskoordinaatti</label>
+        <input type="text" id="mdLatInput" inputmode="decimal" placeholder="61.200000">
+      </div>
+      <div class="field">
+        <label for="mdLonInput">Itäkoordinaatti</label>
+        <input type="text" id="mdLonInput" inputmode="decimal" placeholder="24.000000">
+      </div>
+    </div>
+    <button class="btn btn-blue" id="mdLoadCoordBtn" aria-label="Lataa koordinaattien perusteella">
+      Lataa koordinaattien perusteella
+    </button>
+  </div>
+
+  <div class="btn-row backup-controls" aria-label="Karttadatan varmuuskopiointi">
+    <button class="btn btn-blue" id="mdExportBtn" aria-label="Vie">Vie</button>
+    <button class="btn btn-yellow" id="mdImportBtn" aria-label="Tuo">Tuo</button>
+    <button class="btn btn-red" id="mdClearBtn" aria-label="Tyhjennä data">Tyhjennä data</button>
+  </div>
+  <input type="file" id="mdImportFile" accept="application/json,.json" class="sr-only" aria-hidden="true" tabindex="-1">
+
+  <div class="hint">Lataa OSM-karttadata 2 km säteeltä nykyisestä sijainnista tai annetuista koordinaateista. Uusi haku lisätään aina aiempaan paikalliseen dataan.</div>
 
   <div class="check-group" role="group" aria-label="Maastodatan ilmoitukset">
+    <label class="check-row">
+      <input type="checkbox" id="mdSpeechCb" checked>
+      <span>Ilmoitukset puheella</span>
+    </label>
     <label class="check-row">
       <input type="checkbox" id="mdRoadsCb" checked>
       <span>Tiet ja polut</span>
@@ -711,19 +739,26 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
 
       <h4>Maastodata</h4>
       <p>Maastodata-välilehdellä voit ladata OpenStreetMap-aineistoa
-         nykyisen sijainnin ympäriltä 2 kilometrin säteellä. Lataus hakee
-         tiet, polut ja vesistöt. Data tallennetaan selaimen paikalliseen
-         muistiin, jotta sitä voidaan käyttää myöhemmin ilman uutta hakua.</p>
-      <p>Paina Lataa lähialue verkkoyhteyden aikana. Paina Aloita
-         käynnistääksesi maastodatan GPS-seurannan. Jos Tiet ja polut on
-         valittuna, sovellus vertaa sijaintiasi lähimpään karttadatasta
-         löytyvään tiehen tai polkuun. Reitillä olosta ja reitiltä poissa
-         olosta annetaan vastaavat äänimerkit ja puheilmoitukset kuin
-         GPX-seurannassa.</p>
+         nykyisen sijainnin tai annettujen koordinaattien ympäriltä
+         2 kilometrin säteellä. Lataus hakee tiet, polut ja vesistöt.
+         Uusi haku lisätään aina aiemmin ladattuun aineistoon, eikä
+         aiempaa dataa korvata.</p>
+      <p>Paina Lataa nykysijainnista tai kirjoita koordinaatit ja paina
+         Lataa koordinaattien perusteella verkkoyhteyden aikana.
+         Vie-, Tuo- ja Tyhjennä data -painikkeilla voit varmuuskopioida,
+         palauttaa tai poistaa paikallisesti tallennetun karttadatan.</p>
+      <p>Paina Aloita käynnistääksesi maastodatan GPS-seurannan. Jos
+         Tiet ja polut on valittuna, sovellus vertaa sijaintiasi lähimpään
+         karttadatasta löytyvään tiehen tai polkuun. Tällä välilehdellä
+         reittitoleranssi on kiinteä 7 metriä. Ilmoitukset puheella
+         -valinta määrittää, annetaanko poissa reitiltä -tilanteessa
+         etäisyys- ja suuntatieto puheella.</p>
       <p>Vesistöt-valinnalla sovellus näyttää ja ilmoittaa lähimmän
          karttadatasta löytyvän vesikohteen, kuten puron, joen, ojan,
-         lammen tai järven. Oman liikkumissuunnan ja reitin kulkusuunnan
-         ilmoitukset toimivat samalla periaatteella kuin GPX-seurannassa.</p>
+         lammen tai järven. Sovellus ilmoittaa myös 15 metrin päässä
+         lähestyvästä tie- tai polkuristeyksestä sekä vesistön kanssa
+         risteämisestä. Risteysilmoitus annetaan aina puheella ja se
+         nollautuu, kun poistut risteyksen 15 metrin alueelta.</p>
 
       <h4>Saavutettavuus</h4>
       <p>Kaikki painikkeet ja valintalaatikot ovat saavutettavissa
@@ -901,7 +936,7 @@ function releaseWakeLock() { if(wakeLock){wakeLock.release();wakeLock=null;} }
 
 /* Shared wake lock logic: release only if neither recorder nor places GPS running */
 function maybeReleaseLock() {
-  if(!recIntervalId && !plState.running && !(typeof mdState !== 'undefined' && mdState.running)) releaseWakeLock();
+  if(!recIntervalId && !plState.running) releaseWakeLock();
 }
 
 document.addEventListener('visibilitychange',async()=>{
@@ -1874,11 +1909,22 @@ const mdState = {
   lastUserDir: '',
   lastWaterAnnounceTime: 0,
   lastWaterFeatureId: null,
+  crossingInside: {},
+  lastNearestRoad: null,
   loadedAt: null,
-  center: null
+  center: null,
+  centers: []
 };
 
-const mdLoadBtn = document.getElementById('mdLoadBtn');
+const mdLoadCurrentBtn = document.getElementById('mdLoadCurrentBtn');
+const mdLoadCoordBtn = document.getElementById('mdLoadCoordBtn');
+const mdLatInput = document.getElementById('mdLatInput');
+const mdLonInput = document.getElementById('mdLonInput');
+const mdExportBtn = document.getElementById('mdExportBtn');
+const mdImportBtn = document.getElementById('mdImportBtn');
+const mdClearBtn = document.getElementById('mdClearBtn');
+const mdImportFile = document.getElementById('mdImportFile');
+const mdSpeechCb = document.getElementById('mdSpeechCb');
 const mdGpsToggle = document.getElementById('mdGpsToggle');
 const mdGpsLabel = document.getElementById('mdGpsLabel');
 const mdRoadsCb = document.getElementById('mdRoadsCb');
@@ -1936,6 +1982,7 @@ function mdLoadStoredData() {
     mdState.waters = Array.isArray(data.waters) ? data.waters : [];
     mdState.loadedAt = data.loadedAt || null;
     mdState.center = data.center || null;
+    mdState.centers = Array.isArray(data.centers) ? data.centers : (data.center ? [data.center] : []);
     mdUpdateCounts();
   } catch(e) {
     console.warn('Maastodatan lataus muistista epäonnistui:', e);
@@ -1947,13 +1994,112 @@ function mdSaveStoredData() {
     roads: mdState.roads,
     waters: mdState.waters,
     loadedAt: mdState.loadedAt,
-    center: mdState.center
+    center: mdState.center,
+    centers: mdState.centers
   };
   try {
     localStorage.setItem(MD_STORAGE_KEY, JSON.stringify(data));
   } catch(e) {
     announce('Maastodata ladattiin, mutta sen tallentaminen selaimeen epäonnistui.');
   }
+}
+
+
+function mdFeatureKey(feature) {
+  return (feature.kind || '') + ':' + String(feature.id || '') + ':' + (feature.typeText || '');
+}
+
+function mdMergeFeatureLists(oldList, newList) {
+  const map = new Map();
+  for (const f of oldList || []) map.set(mdFeatureKey(f), f);
+  let added = 0;
+  for (const f of newList || []) {
+    const key = mdFeatureKey(f);
+    if (!map.has(key)) {
+      map.set(key, f);
+      added++;
+    }
+  }
+  return { list: Array.from(map.values()), added };
+}
+
+function mdMergeParsedData(parsed, center) {
+  const roadMerge = mdMergeFeatureLists(mdState.roads, parsed.roads);
+  const waterMerge = mdMergeFeatureLists(mdState.waters, parsed.waters);
+  mdState.roads = roadMerge.list;
+  mdState.waters = waterMerge.list;
+  mdState.loadedAt = new Date().toISOString();
+  mdState.center = center;
+  mdState.centers.push(center);
+  mdSaveStoredData();
+  mdUpdateCounts();
+  return { addedRoads: roadMerge.added, addedWaters: waterMerge.added };
+}
+
+function mdExportData() {
+  const data = {
+    version: 1,
+    source: 'OpenStreetMap / Overpass',
+    exportedAt: new Date().toISOString(),
+    loadedAt: mdState.loadedAt,
+    center: mdState.center,
+    centers: mdState.centers,
+    roads: mdState.roads,
+    waters: mdState.waters
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'maastodata_' + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  announce('Karttadata viety tiedostoksi.');
+}
+
+function mdImportDataFromObject(data) {
+  if (!data || !Array.isArray(data.roads) || !Array.isArray(data.waters)) {
+    throw new Error('Tiedosto ei sisällä kelvollista karttadataa.');
+  }
+  const merged = mdMergeParsedData({ roads: data.roads, waters: data.waters }, data.center || null);
+  if (Array.isArray(data.centers)) {
+    mdState.centers = mdState.centers.concat(data.centers);
+    mdSaveStoredData();
+  }
+  announce('Karttadata tuotu. Uusia teitä ja polkuja ' + merged.addedRoads + ', vesistöjä ' + merged.addedWaters + '.');
+}
+
+async function mdImportDataFile(file) {
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    mdImportDataFromObject(data);
+  } catch(e) {
+    mdSetBanner('Karttadatan tuonti epäonnistui: ' + e.message, 'error');
+    announce('Karttadatan tuonti epäonnistui.');
+  } finally {
+    mdImportFile.value = '';
+  }
+}
+
+function mdClearData() {
+  mdState.roads = [];
+  mdState.waters = [];
+  mdState.loadedAt = null;
+  mdState.center = null;
+  mdState.centers = [];
+  mdState.lastNearestRoad = null;
+  mdState.crossingInside = {};
+  try { localStorage.removeItem(MD_STORAGE_KEY); } catch(e) {}
+  mdUpdateCounts();
+  mdRoadDist.textContent = '–';
+  mdWaterDist.textContent = '–';
+  mdSetRoadBox('Karttadata tyhjennetty.', '');
+  mdSetWaterBox('Karttadata tyhjennetty.', '');
+  mdSetBanner('Maastodata tyhjennetty.', 'idle');
+  announce('Karttadata tyhjennetty.');
 }
 
 function mdGeoOptions() {
@@ -2032,7 +2178,22 @@ function mdParseOverpass(json) {
   return { roads, waters };
 }
 
-async function mdLoadNearbyData() {
+async function mdFetchAndMergeAt(lat, lon, sourceText) {
+  mdSetBanner('Ladataan OSM-maastodataa 2 kilometrin säteeltä…', 'running');
+  announce('Ladataan maastodataa.');
+  const body = 'data=' + encodeURIComponent(mdOverpassQuery(lat, lon));
+  const res = await fetch('https://overpass-api.de/api/interpreter', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+    body
+  });
+  if (!res.ok) throw new Error('Overpass-palvelin palautti virheen ' + res.status);
+  const parsed = mdParseOverpass(await res.json());
+  const merged = mdMergeParsedData(parsed, { lat, lon, radius: MD_RADIUS_M, source: sourceText || 'haku' });
+  announce('Maastodata lisätty. Uusia teitä ja polkuja ' + merged.addedRoads + ', vesistöjä ' + merged.addedWaters + '. Yhteensä teitä ja polkuja ' + mdState.roads.length + ', vesistöjä ' + mdState.waters.length + '.');
+}
+
+async function mdLoadFromCurrentPosition() {
   warmUpAudio();
   if (!navigator.geolocation) {
     mdSetBanner('Paikannusta ei tueta.', 'error');
@@ -2045,23 +2206,24 @@ async function mdLoadNearbyData() {
     const pos = await mdGetCurrentPosition();
     const lat = pos.coords.latitude;
     const lon = pos.coords.longitude;
-    mdSetBanner('Ladataan OSM-maastodataa 2 kilometrin säteeltä…', 'running');
-    announce('Ladataan maastodataa.');
-    const body = 'data=' + encodeURIComponent(mdOverpassQuery(lat, lon));
-    const res = await fetch('https://overpass-api.de/api/interpreter', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-      body
-    });
-    if (!res.ok) throw new Error('Overpass-palvelin palautti virheen ' + res.status);
-    const parsed = mdParseOverpass(await res.json());
-    mdState.roads = parsed.roads;
-    mdState.waters = parsed.waters;
-    mdState.loadedAt = new Date().toISOString();
-    mdState.center = { lat, lon, radius: MD_RADIUS_M };
-    mdSaveStoredData();
-    mdUpdateCounts();
-    announce('Maastodata ladattu. Teitä ja polkuja ' + mdState.roads.length + ', vesistöjä ' + mdState.waters.length + '.');
+    await mdFetchAndMergeAt(lat, lon, 'nykysijainti');
+  } catch(err) {
+    mdSetBanner('Maastodatan lataus epäonnistui: ' + err.message, 'error');
+    announce('Maastodatan lataus epäonnistui.');
+  }
+}
+
+async function mdLoadFromCoordinates() {
+  warmUpAudio();
+  const lat = parseFloat(String(mdLatInput.value).replace(',', '.'));
+  const lon = parseFloat(String(mdLonInput.value).replace(',', '.'));
+  if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+    mdSetBanner('Tarkista koordinaatit.', 'error');
+    announce('Tarkista koordinaatit.');
+    return;
+  }
+  try {
+    await mdFetchAndMergeAt(lat, lon, 'koordinaatit');
   } catch(err) {
     mdSetBanner('Maastodatan lataus epäonnistui: ' + err.message, 'error');
     announce('Maastodatan lataus epäonnistui.');
@@ -2090,7 +2252,8 @@ function mdClosestOnSegment(lat, lon, a, b) {
     distance: dist,
     lat: a.lat + (b.lat - a.lat) * t,
     lon: a.lon + (b.lon - a.lon) * t,
-    bearing: bearingDeg(a.lat, a.lon, b.lat, b.lon)
+    bearing: bearingDeg(a.lat, a.lon, b.lat, b.lon),
+    t
   };
 }
 
@@ -2101,14 +2264,14 @@ function mdNearestFeature(list, lat, lon) {
     for (let i = 0; i < coords.length - 1; i++) {
       const c = mdClosestOnSegment(lat, lon, coords[i], coords[i+1]);
       if (!best || c.distance < best.distance) {
-        best = { feature, distance: c.distance, closestLat: c.lat, closestLon: c.lon, segmentBearing: c.bearing };
+        best = { feature, distance: c.distance, closestLat: c.lat, closestLon: c.lon, segmentBearing: c.bearing, segmentIndex: i, segmentT: c.t };
       }
     }
   }
   return best;
 }
 
-function mdMaybeRoadAudio(isOnRoad, distanceText, directionText) {
+function mdMaybeRoadAudio(isOnRoad, distanceText, directionText, routeAxisText, userDirText) {
   const now = Date.now();
   const stateChanged = mdState.lastOnRoad !== isOnRoad;
   if (isOnRoad) {
@@ -2119,11 +2282,97 @@ function mdMaybeRoadAudio(isOnRoad, distanceText, directionText) {
   } else {
     if (stateChanged || now - mdState.lastOffRoadSoundTime >= MD_ANNOUNCE_INTERVAL_MS) {
       playOffRouteChime();
-      mdSpeak(distanceText + ' ' + directionText + '.', 450);
+      if (mdSpeechCb.checked) {
+        const parts = [distanceText + ' ' + directionText];
+        if (routeAxisText) parts.push('reitin suunta ' + routeAxisText);
+        if (userDirText) parts.push('kuljet ' + userDirText);
+        mdSpeak(parts.join(', ') + '.', 450);
+      }
       mdState.lastOffRoadSoundTime = now;
     }
   }
   mdState.lastOnRoad = isOnRoad;
+}
+
+function mdLineIntersectionMeters(a, b, c, d, refLat, refLon) {
+  const p = mdProjectMeters(a.lat, a.lon, refLat, refLon);
+  const p2 = mdProjectMeters(b.lat, b.lon, refLat, refLon);
+  const q = mdProjectMeters(c.lat, c.lon, refLat, refLon);
+  const q2 = mdProjectMeters(d.lat, d.lon, refLat, refLon);
+  const r = { x: p2.x - p.x, y: p2.y - p.y };
+  const s2 = { x: q2.x - q.x, y: q2.y - q.y };
+  const denom = r.x * s2.y - r.y * s2.x;
+  if (Math.abs(denom) < 0.000001) return null;
+  const qmp = { x: q.x - p.x, y: q.y - p.y };
+  const t = (qmp.x * s2.y - qmp.y * s2.x) / denom;
+  const u = (qmp.x * r.y - qmp.y * r.x) / denom;
+  if (t < 0 || t > 1 || u < 0 || u > 1) return null;
+  return {
+    x: p.x + t * r.x,
+    y: p.y + t * r.y,
+    lat: a.lat + (b.lat - a.lat) * t,
+    lon: a.lon + (b.lon - a.lon) * t,
+    t
+  };
+}
+
+function mdCrossingKey(kind, featureId, segIdx, otherId, otherSegIdx) {
+  return kind + ':' + featureId + ':' + segIdx + ':' + otherId + ':' + otherSegIdx;
+}
+
+function mdMaybeCrossingAnnouncement(lat, lon, nearestRoad) {
+  if (!nearestRoad || !nearestRoad.feature || !Array.isArray(nearestRoad.feature.coords)) return;
+  const heading = mdState.currentHeading;
+  if (heading == null || isNaN(heading)) return;
+  const coords = nearestRoad.feature.coords;
+  const segIdx = nearestRoad.segmentIndex;
+  if (segIdx == null || !coords[segIdx] || !coords[segIdx + 1]) return;
+  const segBearing = nearestRoad.segmentBearing;
+  const forwardInIndexOrder = Math.abs(angleDiff(heading, segBearing)) <= 90;
+  const current = { lat, lon };
+  let best = null;
+
+  function considerIntersection(kind, msg, otherFeature, otherSegIdx, inter) {
+    const d = haversine(lat, lon, inter.lat, inter.lon);
+    if (d > 15) return;
+    const bearingTo = bearingDeg(lat, lon, inter.lat, inter.lon);
+    if (Math.abs(angleDiff(heading, bearingTo)) > 100) return;
+    const key = mdCrossingKey(kind, nearestRoad.feature.id, segIdx, otherFeature.id, otherSegIdx);
+    if (!best || d < best.distance) best = { key, msg, distance: d };
+  }
+
+  const a = coords[segIdx];
+  const b = coords[segIdx + 1];
+  const candidates = [];
+  for (const road of mdState.roads) {
+    if (road.id === nearestRoad.feature.id) continue;
+    candidates.push({ kind: 'road', msg: 'Risteys tulossa', feature: road });
+  }
+  for (const water of mdState.waters) {
+    candidates.push({ kind: 'water', msg: 'Risteää vesistön kanssa', feature: water });
+  }
+
+  for (const cand of candidates) {
+    const oc = cand.feature.coords || [];
+    for (let j = 0; j < oc.length - 1; j++) {
+      const inter = mdLineIntersectionMeters(a, b, oc[j], oc[j+1], lat, lon);
+      if (inter) considerIntersection(cand.kind, cand.msg, cand.feature, j, inter);
+    }
+  }
+
+  const activeKeys = {};
+  if (best) {
+    activeKeys[best.key] = true;
+    if (!mdState.crossingInside[best.key]) {
+      mdSpeak(best.msg);
+      announce(best.msg);
+      mdState.crossingInside[best.key] = true;
+    }
+  }
+
+  for (const key of Object.keys(mdState.crossingInside)) {
+    if (!activeKeys[key]) delete mdState.crossingInside[key];
+  }
 }
 
 function mdHandleRoads(lat, lon) {
@@ -2149,16 +2398,26 @@ function mdHandleRoads(lat, lon) {
   } else {
     mdSetRoadBox('Karttadatan lähin tie tai polku: ' + featureName + ', ' + distText + ' ' + dir + '.', 'off-route');
   }
-  mdMaybeRoadAudio(onRoad, distText, dir);
-
+  let routeAxisForSpeech = '';
   if (mdRouteDirCb.checked && nearest.segmentBearing != null) {
     const axis = axisToText(nearest.segmentBearing);
     mdRouteDirEl.textContent = axis;
-    if (axis && axis !== mdState.lastRouteAxis) {
+    routeAxisForSpeech = axis || '';
+    if (axis && axis !== mdState.lastRouteAxis && mdSpeechCb.checked) {
       mdSpeak('Reitin suunta ' + axis);
       mdState.lastRouteAxis = axis;
     }
   }
+
+  let userDirForSpeech = '';
+  if (mdUserDirCb.checked) {
+    const heading = mdState.currentHeading;
+    userDirForSpeech = heading != null && !isNaN(heading) ? degToText(heading) : '';
+  }
+
+  mdMaybeRoadAudio(onRoad, distText, dir, routeAxisForSpeech, userDirForSpeech);
+  mdState.lastNearestRoad = nearest;
+  if (onRoad) mdMaybeCrossingAnnouncement(lat, lon, nearest);
 }
 
 function mdHandleWaters(lat, lon) {
@@ -2192,7 +2451,7 @@ function mdHandleUserDirection() {
   const heading = mdState.currentHeading;
   const userDir = heading != null && !isNaN(heading) ? degToText(heading) : null;
   mdUserDirEl.textContent = userDir || '–';
-  if (userDir && userDir !== mdState.lastUserDir) {
+  if (userDir && userDir !== mdState.lastUserDir && mdSpeechCb.checked) {
     mdSpeak('Kuljet ' + userDir);
     mdState.lastUserDir = userDir;
   }
@@ -2223,7 +2482,12 @@ mdUserDirCb.addEventListener('change', () => {
   if (!mdUserDirCb.checked) mdUserDirEl.textContent = '–';
 });
 
-mdLoadBtn.addEventListener('click', mdLoadNearbyData);
+mdLoadCurrentBtn.addEventListener('click', mdLoadFromCurrentPosition);
+mdLoadCoordBtn.addEventListener('click', mdLoadFromCoordinates);
+mdExportBtn.addEventListener('click', mdExportData);
+mdImportBtn.addEventListener('click', () => mdImportFile.click());
+mdImportFile.addEventListener('change', e => mdImportDataFile(e.target.files[0]));
+mdClearBtn.addEventListener('click', mdClearData);
 
 mdGpsToggle.addEventListener('click', async () => {
   warmUpAudio();
@@ -2241,6 +2505,7 @@ mdGpsToggle.addEventListener('click', async () => {
     mdState.lastRouteAxis = '';
     mdState.lastUserDir = '';
     mdState.lastWaterAnnounceTime = 0;
+    mdState.crossingInside = {};
     mdState.watchId = navigator.geolocation.watchPosition(
       mdHandlePosition,
       err => { mdSetBanner('GPS-virhe: ' + err.message, 'error'); announce('GPS-virhe.'); },
