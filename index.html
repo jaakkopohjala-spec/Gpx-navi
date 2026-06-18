@@ -791,16 +791,27 @@ function ensureAudio() {
 
 function primeSpeech() {
   if (!window.speechSynthesis || speechReady) return;
-  const u = new SpeechSynthesisUtterance(' ');
-  u.volume = 0;
+  speechReady = true; // merkitään heti, jotta ei kutsuta kahteen kertaan
+  const u = new SpeechSynthesisUtterance('​'); // nolla-leveyden välilyönti
+  u.volume = 0.001;  // iOS vaatii > 0 volumen
   u.lang = 'fi-FI';
   u.rate = 1.1;
   speechSynthesis.speak(u);
-  speechReady = true;
 }
 
 function warmUpAudio() {
   try { ensureAudio(); } catch(e) {}
+  primeSpeech();
+}
+
+// Käytetään GPS-napin painalluksen yhteydessä: varmistaa että iOS-puhe toimii
+function warmUpAudioForGps() {
+  try { ensureAudio(); } catch(e) {}
+  // Nollataan tila ja primetaan uudelleen aina GPS-käynnistyksessä
+  if (window.speechSynthesis) {
+    try { window.speechSynthesis.cancel(); } catch(e) {}
+  }
+  speechReady = false;
   primeSpeech();
 }
 
@@ -1481,9 +1492,46 @@ function mdSetWaterBox(msg, state) {
   mdWaterStatus.dataset.state = state || '';
 }
 
+// md-puhejono — iOS-yhteensopiva (kuten navSpeak)
+const mdSpeechState = { queue: [], speaking: false };
+
+function processMdSpeechQueue() {
+  if (mdSpeechState.speaking || !mdSpeechState.queue.length || !window.speechSynthesis) return;
+  const item = mdSpeechState.queue.shift();
+  mdSpeechState.speaking = true;
+  const speakNow = () => {
+    const u = new SpeechSynthesisUtterance(item.text);
+    u.lang = 'fi-FI';
+    u.rate = 1.1;
+    // iOS watchdog: jos onend ei tule 15s sisällä, nollataan tila
+    const watchdog = setTimeout(() => {
+      mdSpeechState.speaking = false;
+      processMdSpeechQueue();
+    }, 15000);
+    u.onend = u.onerror = () => {
+      clearTimeout(watchdog);
+      mdSpeechState.speaking = false;
+      setTimeout(processMdSpeechQueue, 80);
+    };
+    // iOS: tarkistetaan että synteesi ei ole pysähtynyt
+    if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+    speechSynthesis.speak(u);
+  };
+  if (item.delay) {
+    setTimeout(speakNow, item.delay);
+  } else {
+    speakNow();
+  }
+}
+
 function mdSpeak(text, delay) {
-  if (!text) return;
-  setTimeout(() => speakAt110(text), delay || 0);
+  if (!window.speechSynthesis || !text) return;
+  // iOS: jos puhesynteesi on pysähtynyt, yritetään elvyttää se
+  if (window.speechSynthesis.paused) {
+    window.speechSynthesis.resume();
+  }
+  mdSpeechState.queue.push({ text, delay: delay || 0 });
+  processMdSpeechQueue();
 }
 
 function mdUpdateCounts() {
@@ -1829,10 +1877,16 @@ function mdMaybeRoadAudio(isOnRoad, distanceText, directionText, routeAxisText, 
     if (stateChanged || now - mdState.lastRoadSoundTime >= MD_ANNOUNCE_INTERVAL_MS) {
       playKnock();
       mdState.lastRoadSoundTime = now;
+      // Kerrotaan suunnat tilanmuutoksessa tai 20 s välein jos valittu
+      const parts = [];
+      if (routeAxisText) parts.push('Reitin suunta ' + routeAxisText);
+      if (userDirText) parts.push('kuljet ' + userDirText);
+      if (parts.length) mdSpeak(parts.join(', ') + '.', 350);
     }
   } else {
     if (stateChanged || now - mdState.lastOffRoadSoundTime >= MD_ANNOUNCE_INTERVAL_MS) {
       playOffRouteChime();
+      // Poissa tieltä: etäisyys + suunta lähimpään tiehen/polkuun
       const parts = [distanceText + ' ' + directionText];
       if (routeAxisText) parts.push('reitin suunta ' + routeAxisText);
       if (userDirText) parts.push('kuljet ' + userDirText);
@@ -2157,9 +2211,9 @@ function mdHandleUserDirection() {
   const heading = mdState.currentHeading;
   const userDir = heading != null && !isNaN(heading) ? degToText(heading) : null;
   mdUserDirEl.textContent = userDir || '–';
-  if (userDir && userDir !== mdState.lastUserDir) {
-    mdState.lastUserDir = userDir;
-  }
+  // Suunnan päivitys tapahtuu näytölle — puheella ilmoitetaan osana
+  // reitillä/poissa reitiltä -ilmoitusta mdMaybeRoadAudio:ssa
+  if (userDir) mdState.lastUserDir = userDir;
 }
 
 function mdHandlePosition(pos) {
@@ -2213,7 +2267,7 @@ mdPlaceOkBtn.addEventListener('click', mdSaveOwnPlaceFromForm);
 mdPlaceCancelBtn.addEventListener('click', () => { mdState.editingOwnPlaceId = null; mdSavePlaceForm.style.display = 'none'; });
 
 mdGpsToggle.addEventListener('click', async () => {
-  warmUpAudio();
+  warmUpAudioForGps();
   if (!mdState.running) {
     if (!navigator.geolocation) {
       mdSetBanner('Paikannusta ei tueta.', 'error');
@@ -2231,6 +2285,8 @@ mdGpsToggle.addEventListener('click', async () => {
     mdState.crossingInside = {};
     mdState.ownPlaceInside = {};
     delete mdState.waterProximityInside;
+    mdSpeechState.queue = [];
+    mdSpeechState.speaking = false;
     mdState.watchId = navigator.geolocation.watchPosition(
       mdHandlePosition,
       err => { mdSetBanner('GPS-virhe: ' + err.message, 'error'); announce('GPS-virhe.'); },
@@ -2246,6 +2302,10 @@ mdGpsToggle.addEventListener('click', async () => {
   } else {
     navigator.geolocation.clearWatch(mdState.watchId);
     mdState.running = false;
+    mdSpeechState.queue = [];
+    mdSpeechState.speaking = false;
+    if (window.speechSynthesis) { speechSynthesis.cancel(); }
+    speechReady = false;
     maybeReleaseLock();
     mdGpsLabel.textContent = 'Aloita GPS-seuranta';
     mdGpsToggle.className = 'btn btn-green';
