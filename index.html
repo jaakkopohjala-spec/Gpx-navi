@@ -603,6 +603,7 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
     <div id="mdNearestList" class="nearest-list" role="list">
       <p class="places-empty" id="mdNearestEmpty">Ei kohteita.</p>
     </div>
+    <button class="btn btn-blue" id="mdNearestMoreBtn" style="display:none">Näytä lisää</button>
   </div>
 
   <div class="status-banner" data-state="idle" id="mdBanner">
@@ -1481,6 +1482,9 @@ const mdState = {
   lastWaterFeatureId: null,
   crossingInside: {},
   ownPlaceInside: {},
+  categoryInside: {},
+  nearestGroupKey: null,
+  nearestGroupLimit: 10,
   lastNearestRoad: null,
   loadedAt: null,
   center: null,
@@ -1530,6 +1534,7 @@ const mdNearestPanel = document.getElementById('mdNearestPanel');
 const mdNearestTitle = document.getElementById('mdNearestTitle');
 const mdNearestList = document.getElementById('mdNearestList');
 const mdNearestEmpty = document.getElementById('mdNearestEmpty');
+const mdNearestMoreBtn = document.getElementById('mdNearestMoreBtn');
 const mdUserDirCb = document.getElementById('mdUserDirCb');
 const mdRouteDirCb = document.getElementById('mdRouteDirCb');
 const mdBannerEl = document.getElementById('mdBanner');
@@ -1813,6 +1818,7 @@ function mdClearData() {
   mdState.lastNearestRoad = null;
   mdState.crossingInside = {};
   mdState.ownPlaceInside = {};
+  mdState.categoryInside = {};
   try { localStorage.removeItem(MD_STORAGE_KEY); } catch(e) {}
   mdUpdateCounts();
   mdRoadDist.textContent = '–';
@@ -2177,6 +2183,55 @@ function mdCrossingKey(kind, featureId, segIdx, otherId, otherSegIdx) {
   return kind + ':' + featureId + ':' + segIdx + ':' + otherId + ':' + otherSegIdx;
 }
 
+function mdCrossingDirectionText(heading, otherCoords, otherSegIdx, inter) {
+  if (heading == null || isNaN(heading) || !Array.isArray(otherCoords)) return '';
+
+  const bearings = [];
+  function addBearingToPoint(pt) {
+    if (!pt) return;
+    const d = haversine(inter.lat, inter.lon, pt.lat, pt.lon);
+    if (d < 1) return;
+    bearings.push(bearingDeg(inter.lat, inter.lon, pt.lat, pt.lon));
+  }
+
+  const a = otherCoords[otherSegIdx];
+  const b = otherCoords[otherSegIdx + 1];
+  if (a && haversine(inter.lat, inter.lon, a.lat, a.lon) > 1) {
+    addBearingToPoint(a);
+  } else if (otherSegIdx > 0) {
+    addBearingToPoint(otherCoords[otherSegIdx - 1]);
+  }
+
+  if (b && haversine(inter.lat, inter.lon, b.lat, b.lon) > 1) {
+    addBearingToPoint(b);
+  } else if (otherSegIdx + 2 < otherCoords.length) {
+    addBearingToPoint(otherCoords[otherSegIdx + 2]);
+  }
+
+  let hasLeft = false;
+  let hasRight = false;
+  for (const br of bearings) {
+    const diff = angleDiff(heading, br);
+    const abs = Math.abs(diff);
+    // Ohitetaan suunnat, jotka ovat lähes kulkusuunnan suuntaisia tai suoraan takana.
+    // Näin risteyssuunnaksi jää käyttäjän näkökulmasta vasen/oikea/poikittain.
+    if (abs < 25 || abs > 155) continue;
+    if (diff > 0) hasRight = true;
+    if (diff < 0) hasLeft = true;
+  }
+
+  if (hasLeft && hasRight) return 'poikittain';
+  if (hasRight) return 'oikealle';
+  if (hasLeft) return 'vasemmalle';
+  return '';
+}
+
+function mdRoadCrossingMessage(road, directionText) {
+  const name = road && road.name ? String(road.name).trim() : '';
+  if (name) return 'Risteys, ' + name + (directionText ? ' ' + directionText : '');
+  return 'Risteys' + (directionText ? ', ' + directionText : '');
+}
+
 function mdMaybeCrossingAnnouncement(lat, lon, nearestRoad) {
   if (!nearestRoad || !nearestRoad.feature || !Array.isArray(nearestRoad.feature.coords)) return;
   const heading = mdState.currentHeading;
@@ -2195,7 +2250,12 @@ function mdMaybeCrossingAnnouncement(lat, lon, nearestRoad) {
     const bearingTo = bearingDeg(lat, lon, inter.lat, inter.lon);
     if (Math.abs(angleDiff(heading, bearingTo)) > 100) return;
     const key = mdCrossingKey(kind, nearestRoad.feature.id, segIdx, otherFeature.id, otherSegIdx);
-    if (!best || d < best.distance) best = { key, msg, distance: d };
+    let finalMsg = msg;
+    if (kind === 'road') {
+      const directionText = mdCrossingDirectionText(heading, otherFeature.coords || [], otherSegIdx, inter);
+      finalMsg = mdRoadCrossingMessage(otherFeature, directionText);
+    }
+    if (!best || d < best.distance) best = { key, msg: finalMsg, distance: d };
   }
 
   const a = coords[segIdx];
@@ -2203,7 +2263,7 @@ function mdMaybeCrossingAnnouncement(lat, lon, nearestRoad) {
   const candidates = [];
   for (const road of mdState.roads) {
     if (road.id === nearestRoad.feature.id) continue;
-    candidates.push({ kind: 'road', msg: 'Risteys' + (road.name ? ', ' + road.name : ''), feature: road });
+    candidates.push({ kind: 'road', msg: mdRoadCrossingMessage(road, ''), feature: road });
   }
   for (const water of mdState.waters) {
     candidates.push({ kind: 'water', msg: 'Risteää vesistön kanssa', feature: water });
@@ -2222,7 +2282,6 @@ function mdMaybeCrossingAnnouncement(lat, lon, nearestRoad) {
     activeKeys[best.key] = true;
     if (!mdState.crossingInside[best.key]) {
       mdSpeak(best.msg);
-      announce(best.msg);
       mdState.crossingInside[best.key] = true;
     }
   }
@@ -2252,19 +2311,27 @@ function mdGroupConfig(key) {
 }
 
 function mdShowNearestGroup(key) {
-  const cfg = mdGroupConfig(key);
+  mdState.nearestGroupKey = key;
+  mdState.nearestGroupLimit = 10;
+  mdRenderNearestGroup();
+}
+
+function mdRenderNearestGroup() {
+  const cfg = mdGroupConfig(mdState.nearestGroupKey);
   if (!cfg) return;
   mdNearestPanel.style.display = '';
   mdNearestTitle.textContent = cfg.title;
   [...mdNearestList.querySelectorAll('.nearest-item')].forEach(el => el.remove());
   const lat = mdState.currentLat;
   const lon = mdState.currentLon;
+  mdNearestMoreBtn.style.display = 'none';
   if (lat == null || lon == null) {
     mdNearestEmpty.textContent = 'Aloita GPS-seuranta ensin.';
     mdNearestEmpty.style.display = '';
     return;
   }
-  const list = cfg.cb && !cfg.cb.checked ? [] : mdTopNearestFeatures(cfg.list, lat, lon, 10);
+  const all = cfg.cb && !cfg.cb.checked ? [] : mdTopNearestFeatures(cfg.list, lat, lon, Infinity);
+  const list = all.slice(0, mdState.nearestGroupLimit || 10);
   if (!list.length) {
     mdNearestEmpty.textContent = 'Ei kohteita.';
     mdNearestEmpty.style.display = '';
@@ -2287,6 +2354,10 @@ function mdShowNearestGroup(key) {
     row.appendChild(nameEl);
     row.appendChild(distEl);
     mdNearestList.appendChild(row);
+  }
+  if (all.length > list.length) {
+    mdNearestMoreBtn.style.display = '';
+    mdNearestMoreBtn.textContent = 'Näytä lisää';
   }
 }
 
@@ -2389,7 +2460,6 @@ function mdMaybeOwnPlaceAnnouncements(lat, lon) {
       if (!mdState.ownPlaceInside[p.id]) {
         const dir = degToText(bearingDeg(lat, lon, p.lat, p.lon));
         mdSpeak(p.name + ' 15 metriä ' + dir);
-        announce(p.name + ' 15 metriä ' + dir);
         mdState.ownPlaceInside[p.id] = true;
       }
     }
@@ -2487,7 +2557,6 @@ function mdMaybeWaterProximityAnnouncement(lat, lon) {
   const dir = degToText(bearingDeg(lat, lon, nearest.closestLat, nearest.closestLon));
   const distText = Math.round(d) + ' m';
   mdSpeak(featureName + ' ' + distText + ' ' + dir);
-  announce(featureName + ' ' + distText + ' ' + dir);
   mdState.waterProximityInside = featureId;
 }
 
@@ -2510,6 +2579,36 @@ function mdHandleWaters(lat, lon) {
   mdSetWaterBox('Lähin vesistö: ' + featureName + ', ' + distText + ' ' + dir + '.', '');
   // Puheilmoitus annetaan mdMaybeCrossingAnnouncement-funktiossa 15 m säteellä (risteytyminen).
   // Tästä funktiosta poistettu jatkuva aikaväli-ilmoitus — vesistö puhutaan vain risteytyessä.
+}
+
+function mdMaybeCategoryProximityAnnouncements(lat, lon) {
+  const groups = [
+    ['outdoor', mdOutdoorCb],
+    ['structures', mdStructuresCb],
+    ['landtypes', mdLandtypesCb],
+    ['barriers', mdBarriersCb],
+    ['elevations', mdElevationsCb]
+  ];
+  const activeNow = {};
+  for (const [key, cb] of groups) {
+    if (cb && !cb.checked) continue;
+    const cfg = mdGroupConfig(key);
+    if (!cfg || !Array.isArray(cfg.list)) continue;
+    const nearest = mdNearestFeature(cfg.list, lat, lon);
+    if (!nearest || nearest.distance > 15) continue;
+    const featureId = String(nearest.feature.id || mdFeatureName(nearest.feature));
+    const stateKey = key + ':' + featureId;
+    activeNow[stateKey] = true;
+    if (mdState.categoryInside[stateKey]) continue;
+    const featureName = mdFeatureName(nearest.feature);
+    const dir = degToText(bearingDeg(lat, lon, nearest.closestLat, nearest.closestLon));
+    const distText = Math.round(nearest.distance) + ' m';
+    mdSpeak(featureName + ' ' + distText + ' ' + dir);
+    mdState.categoryInside[stateKey] = true;
+  }
+  for (const key of Object.keys(mdState.categoryInside)) {
+    if (!activeNow[key]) delete mdState.categoryInside[key];
+  }
 }
 
 function mdHandleUserDirection() {
@@ -2535,10 +2634,12 @@ function mdHandlePosition(pos) {
   mdHandleRoads(lat, lon);
   mdHandleWaters(lat, lon);
   mdMaybeWaterProximityAnnouncement(lat, lon);
+  mdMaybeCategoryProximityAnnouncements(lat, lon);
   mdHandleUserDirection();
   mdMaybeOwnPlaceAnnouncements(lat, lon);
   mdHandleOwnPlaceDisplay(lat, lon);
   mdRenderOwnPlaces();
+  if (mdNearestPanel.style.display !== 'none' && mdState.nearestGroupKey) mdRenderNearestGroup();
 }
 
 mdRouteDirCb.addEventListener('change', () => {
@@ -2578,6 +2679,10 @@ mdShowStructuresBtn.addEventListener('click', () => mdShowNearestGroup('structur
 mdShowLandtypesBtn.addEventListener('click', () => mdShowNearestGroup('landtypes'));
 mdShowBarriersBtn.addEventListener('click', () => mdShowNearestGroup('barriers'));
 mdShowElevationsBtn.addEventListener('click', () => mdShowNearestGroup('elevations'));
+mdNearestMoreBtn.addEventListener('click', () => {
+  mdState.nearestGroupLimit = (mdState.nearestGroupLimit || 10) + 10;
+  mdRenderNearestGroup();
+});
 
 
 mdGpsToggle.addEventListener('click', async () => {
@@ -2598,6 +2703,7 @@ mdGpsToggle.addEventListener('click', async () => {
     mdState.lastWaterAnnounceTime = 0;
     mdState.crossingInside = {};
     mdState.ownPlaceInside = {};
+    mdState.categoryInside = {};
     delete mdState.waterProximityInside;
     mdSpeechState.queue = [];
     mdSpeechState.speaking = false;
