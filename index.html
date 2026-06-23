@@ -1876,7 +1876,7 @@ function mdOverpassQuery(lat, lon) {
   way(around:${MD_RADIUS_M},${lat},${lon})["ele"];
   relation(around:${MD_RADIUS_M},${lat},${lon})["ele"];
 );
-out tags geom;`;
+out body geom;`;
 }
 
 function mdRoadTypeText(tags) {
@@ -2027,7 +2027,7 @@ async function mdFetchAndMergeAt(lat, lon, sourceText) {
   if (!res.ok) throw new Error('Overpass-palvelin palautti virheen ' + res.status);
   const parsed = mdParseOverpass(await res.json());
   const merged = mdMergeParsedData(parsed, { lat, lon, radius: MD_RADIUS_M, source: sourceText || 'haku' });
-  announce('Kartta lisätty. Uusia teitä ja polkuja ' + merged.addedRoads + ', vesistöjä ' + merged.addedWaters + '.');
+  announce('Kartta lisätty. Uusia teitä ja polkuja ' + merged.addedRoads + ', vesistöjä ' + merged.addedWaters + ', retkeilykohteita ' + (merged.addedOutdoor || 0) + ', rakenteita ' + (merged.addedStructures || 0) + ', maastotyyppejä ' + (merged.addedLandtypes || 0) + ', esteitä ' + (merged.addedBarriers || 0) + ', korkeustietoja ' + (merged.addedElevations || 0) + '.');
 }
 
 async function mdLoadFromCurrentPosition() {
