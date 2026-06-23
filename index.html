@@ -212,6 +212,29 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
 .nearest-item-name { font-size:.95rem; font-weight:700; line-height:1.35; }
 .nearest-item-dist { font-size:.8rem; color:var(--muted); margin-top:.2rem; line-height:1.4; }
 
+
+/* Uusi yksisivuinen käyttöliittymä */
+.topbar { display:none !important; }
+#panel-nav, #panel-rec { display:none !important; }
+#panel-map { display:flex !important; }
+.app-title { font-size:1.15rem; color:var(--blue); text-transform:uppercase; letter-spacing:.08em; margin:.1rem 0 .25rem; }
+.big-gps { min-height:68px; font-size:1.05rem; }
+.home-actions { display:grid; grid-template-columns:1fr 1fr; gap:.55rem; }
+.home-actions .btn-full { grid-column:1 / -1; }
+.category-grid { display:grid; grid-template-columns:1fr 1fr; gap:.45rem; }
+.category-grid .btn { min-height:48px; font-size:.78rem; padding:.25rem .4rem; letter-spacing:.02em; }
+.compact-checks .check-row { min-height:46px; padding:.55rem .8rem; }
+.full-view { position:fixed; inset:0; z-index:200; background:var(--bg); color:var(--text); overflow-y:auto; padding:calc(.75rem + env(safe-area-inset-top,0px)) 1rem calc(1rem + var(--safe-b)); max-width:none; width:100%; }
+.full-view .view-inner { max-width:480px; margin:0 auto; display:flex; flex-direction:column; gap:.75rem; }
+.view-header { display:flex; align-items:center; gap:.75rem; margin-bottom:.25rem; }
+.back-btn { width:auto; min-width:110px; min-height:46px; padding:0 .8rem; }
+.view-title { font-size:1rem; color:var(--blue); text-transform:uppercase; letter-spacing:.08em; }
+.load-options { display:grid; grid-template-columns:1fr; gap:.45rem; }
+.small-grid { display:grid; grid-template-columns:1fr 1fr; gap:.45rem; }
+.sr-friendly-hidden { display:none !important; }
+#mdRoadStatus, #mdWaterStatus, #mdOwnPlaceStatus, #mdGpxStatus { font-size:.82rem; padding:.6rem .75rem; min-height:44px; }
+#mdDataInfoContent .stats { margin-top:.5rem; }
+
 </style>
 </head>
 <body>
@@ -461,149 +484,29 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
 
 <!-- ══════ KARTTA JA PAIKAT ══════ -->
 <section class="panel" id="panel-map" role="tabpanel" aria-labelledby="tab-map">
+  <h1 class="app-title">Kartta ja paikat</h1>
 
-  <div class="btn-row">
-    <button class="btn btn-blue" id="mdOpenLoadBtn" aria-expanded="false" aria-controls="mdLoadPanel">
-      Lataa kartta
-    </button>
-    <button class="btn btn-blue" id="mdSaveLocationBtn" aria-label="Tallenna sijainti">
-      Tallenna sijainti
-    </button>
+  <button class="btn btn-green big-gps" id="mdGpsToggle" aria-pressed="false" aria-label="Aloita GPS-seuranta">
+    <span id="mdGpsLabel">Aloita GPS-seuranta</span>
+  </button>
+
+  <div class="home-actions">
+    <button class="btn btn-blue" id="mdOpenLoadBtn" aria-expanded="false" aria-controls="mdLoadPanel">Karttatoiminnot</button>
+    <button class="btn btn-blue" id="mdSaveLocationBtn" aria-label="Tallenna sijainti">Tallenna sijainti</button>
+    <button class="btn btn-yellow btn-full" id="mdNotificationsBtn" aria-expanded="false" aria-controls="mdNotificationsPanel">Ilmoitukset</button>
   </div>
 
-  <div class="btn-row">
-    <button class="btn btn-yellow" id="mdOwnPlacesBtn" aria-expanded="false" aria-controls="mdOwnPlacesPanel">
-      Omat paikat
-    </button>
-    <button class="btn btn-green" id="mdGpsToggle"
-            aria-pressed="false" aria-label="Aloita GPS-seuranta">
-      <span id="mdGpsLabel">Aloita GPS-seuranta</span>
-    </button>
-  </div>
-
-  <div class="save-form" id="mdLoadPanel" style="display:none" role="region" aria-label="Lataa kartta">
-    <span class="save-form-title">Lataa kartta</span>
-    <button class="btn btn-blue" id="mdLoadCurrentBtn" aria-label="Lataa nykysijainnista">
-      Lataa nykysijainnista
-    </button>
-    <div class="coord-row">
-      <div class="field">
-        <label for="mdLatInput">Pohjoiskoordinaatti</label>
-        <input type="text" id="mdLatInput" inputmode="decimal" placeholder="61.200000">
-      </div>
-      <div class="field">
-        <label for="mdLonInput">Itäkoordinaatti</label>
-        <input type="text" id="mdLonInput" inputmode="decimal" placeholder="24.000000">
-      </div>
-    </div>
-    <button class="btn btn-blue" id="mdLoadCoordBtn" aria-label="Lataa koordinaateista">
-      Lataa koordinaateista
-    </button>
-    <div class="hint">Kartta haetaan 2 km säteeltä. Uusi haku lisätään aiempaan dataan.</div>
-  </div>
-
-  <div class="save-form" id="mdSavePlaceForm" style="display:none" role="region" aria-label="Tallenna oma paikka">
-    <span class="save-form-title" id="mdSavePlaceTitle">Tallenna oma paikka</span>
-    <div class="field">
-      <label for="mdPlaceName">Paikan nimi</label>
-      <input type="text" id="mdPlaceName" placeholder="Kirjoita nimi…" autocomplete="off" autocorrect="off" spellcheck="false">
-    </div>
-    <div class="coord-row">
-      <div class="field">
-        <label for="mdPlaceLat">Pohjoiskoordinaatti</label>
-        <input type="text" id="mdPlaceLat" inputmode="decimal" placeholder="61.200000">
-      </div>
-      <div class="field">
-        <label for="mdPlaceLon">Itäkoordinaatti</label>
-        <input type="text" id="mdPlaceLon" inputmode="decimal" placeholder="24.000000">
-      </div>
-    </div>
-    <div class="btn-row">
-      <button class="btn btn-green" id="mdPlaceOkBtn">OK</button>
-      <button class="btn btn-red" id="mdPlaceCancelBtn">Peruuta</button>
-    </div>
-  </div>
-
-  <div class="save-form" id="mdOwnPlacesPanel" style="display:none" role="region" aria-label="Omat paikat">
-    <span class="save-form-title">Omat paikat</span>
-    <div id="mdOwnPlacesList" class="places-list" role="list">
-      <p class="places-empty" id="mdOwnPlacesEmpty">Ei tallennettuja omia paikkoja.</p>
-    </div>
-  </div>
-
-  <div class="btn-row backup-controls" aria-label="Karttadatan varmuuskopiointi">
-    <button class="btn btn-blue" id="mdExportBtn" aria-label="Vie">Vie</button>
-    <button class="btn btn-yellow" id="mdImportBtn" aria-label="Tuo">Tuo</button>
-    <button class="btn btn-red" id="mdClearBtn" aria-label="Tyhjennä data">Tyhjennä data</button>
-  </div>
-  <input type="file" id="mdImportFile" accept="application/json,.json" class="sr-only" aria-hidden="true" tabindex="-1">
-
-  <div class="check-group" role="group" aria-label="Kartta- ja paikkailmoitukset">
-    <div class="check-row map-group-row">
-      <label class="map-group-top">
-        <input type="checkbox" id="mdRoadsCb" checked>
-        <span>Tiet ja polut</span>
-      </label>
-      <button class="btn btn-blue" id="mdShowRoadsBtn">Näytä lähimmät</button>
-    </div>
-    <div class="check-row map-group-row">
-      <label class="map-group-top">
-        <input type="checkbox" id="mdWaterCb" checked>
-        <span>Vesistöt</span>
-      </label>
-      <button class="btn btn-blue" id="mdShowWatersBtn">Näytä lähimmät</button>
-    </div>
-    <div class="check-row map-group-row">
-      <label class="map-group-top">
-        <input type="checkbox" id="mdOutdoorCb" checked>
-        <span>Retkeilykohteet</span>
-      </label>
-      <button class="btn btn-blue" id="mdShowOutdoorBtn">Näytä lähimmät</button>
-    </div>
-    <div class="check-row map-group-row">
-      <label class="map-group-top">
-        <input type="checkbox" id="mdStructuresCb" checked>
-        <span>Rakennukset ja rakenteet</span>
-      </label>
-      <button class="btn btn-blue" id="mdShowStructuresBtn">Näytä lähimmät</button>
-    </div>
-    <div class="check-row map-group-row">
-      <label class="map-group-top">
-        <input type="checkbox" id="mdLandtypesCb" checked>
-        <span>Maastotyypit</span>
-      </label>
-      <button class="btn btn-blue" id="mdShowLandtypesBtn">Näytä lähimmät</button>
-    </div>
-    <div class="check-row map-group-row">
-      <label class="map-group-top">
-        <input type="checkbox" id="mdBarriersCb" checked>
-        <span>Esteet ja rajoitukset</span>
-      </label>
-      <button class="btn btn-blue" id="mdShowBarriersBtn">Näytä lähimmät</button>
-    </div>
-    <div class="check-row map-group-row">
-      <label class="map-group-top">
-        <input type="checkbox" id="mdElevationsCb" checked>
-        <span>Korkeustagit</span>
-      </label>
-      <button class="btn btn-blue" id="mdShowElevationsBtn">Näytä lähimmät</button>
-    </div>
-    <label class="check-row">
-      <input type="checkbox" id="mdUserDirCb">
-      <span>Kerro oma liikkumissuunta</span>
-    </label>
-    <label class="check-row">
-      <input type="checkbox" id="mdRouteDirCb">
-      <span>Kerro reitin kulkusuunta</span>
-    </label>
-  </div>
-
-  <div class="save-form" id="mdNearestPanel" style="display:none" role="region" aria-label="Lähimmät kohteet">
-    <span class="save-form-title" id="mdNearestTitle">Lähimmät</span>
-    <div id="mdNearestList" class="nearest-list" role="list">
-      <p class="places-empty" id="mdNearestEmpty">Ei kohteita.</p>
-    </div>
-    <button class="btn btn-blue" id="mdNearestMoreBtn" style="display:none">Näytä lisää</button>
+  <div class="category-grid" aria-label="Kategoriat">
+    <button class="btn btn-blue" id="mdOwnPlacesBtn" aria-expanded="false" aria-controls="mdOwnPlacesPanel">Omat paikat</button>
+    <button class="btn btn-blue" id="mdGpxBtn" aria-expanded="false" aria-controls="mdGpxPanel">GPX</button>
+    <button class="btn btn-blue" id="mdShowRoadsBtn">Tiet ja polut</button>
+    <button class="btn btn-blue" id="mdShowWatersBtn">Vesistöt</button>
+    <button class="btn btn-blue" id="mdShowOutdoorBtn">Retkeilykohteet</button>
+    <button class="btn btn-blue" id="mdShowParkingBtn">Pysäköinti</button>
+    <button class="btn btn-blue" id="mdShowStructuresBtn">Rakennukset ja rakenteet</button>
+    <button class="btn btn-blue" id="mdShowLandtypesBtn">Maastotyypit</button>
+    <button class="btn btn-blue" id="mdShowBarriersBtn">Esteet ja rajoitukset</button>
+    <button class="btn btn-blue" id="mdShowElevationsBtn">Korkeustagit</button>
   </div>
 
   <div class="status-banner" data-state="idle" id="mdBanner">
@@ -611,46 +514,55 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
     <span id="mdBannerText">Karttadataa ei ole vielä ladattu.</span>
   </div>
 
-  <div class="info-box" id="mdRoadStatus" aria-label="Tie- ja polkutieto" role="status" aria-live="off">
-    Lataa kartta ja aloita GPS-seuranta.
+  <div class="info-box" id="mdRoadStatus" aria-label="Tie- ja polkutieto" role="status" aria-live="off">Lataa kartta ja aloita GPS-seuranta.</div>
+  <div class="info-box" id="mdWaterStatus" aria-label="Vesistötieto" role="status" aria-live="off">Lähin vesistö näytetään seurannan aikana.</div>
+  <div class="info-box" id="mdGpxStatus" aria-label="GPX-reittitieto" role="status" aria-live="off">GPX-reitti näytetään, kun reitti on tuotu tai tallennettu.</div>
+  <div class="info-box" id="mdOwnPlaceStatus" aria-label="Lähin oma paikka" role="status" aria-live="off">Lähin oma paikka näytetään seurannan aikana.</div>
+
+  <div class="check-group compact-checks" role="group" aria-label="Suunta-asetukset">
+    <label class="check-row"><input type="checkbox" id="mdUserDirCb"><span>Kerro oma liikkumissuunta</span></label>
+    <label class="check-row"><input type="checkbox" id="mdRouteDirCb"><span>Kerro reitin kulkusuunta</span></label>
   </div>
 
-  <div class="info-box" id="mdWaterStatus" aria-label="Vesistötieto" role="status" aria-live="off">
-    Lähin vesistö näytetään seurannan aikana, jos Vesistöt on valittu.
-  </div>
+  <button class="btn btn-blue" onclick="openHelp()" aria-label="Ohje">Ohje</button>
 
-  <div class="info-box" id="mdOwnPlaceStatus" aria-label="Lähin oma paikka" role="status" aria-live="off">
-    Lähin oma paikka näytetään seurannan aikana.
-  </div>
+  <div class="hint">Karttadata © OpenStreetMapin tekijät. Tieto voi olla puutteellista.</div>
 
-  <div>
-    <button class="collapsible-btn" id="mdDataInfoBtn"
-            aria-expanded="false" aria-controls="mdDataInfoContent"
-            onclick="toggleCollapsible('mdDataInfoBtn','mdDataInfoContent')">
-      <span>Karttadatan tiedot</span>
-      <span class="arrow" aria-hidden="true">&#9660;</span>
-    </button>
-    <div class="collapsible-content" id="mdDataInfoContent" role="region" aria-labelledby="mdDataInfoBtn">
-      <div class="stats" role="region" aria-label="Karttadatan tiedot" style="margin-top:.5rem">
-        <div class="stat"><span class="stat-label">Tiet ja polut</span><span class="stat-value" id="mdRoadCount">0</span></div>
-        <div class="stat"><span class="stat-label">Vesistöt</span><span class="stat-value" id="mdWaterCount">0</span></div>
-        <div class="stat"><span class="stat-label">Retkeilykohteet</span><span class="stat-value" id="mdOutdoorCount">0</span></div>
-        <div class="stat"><span class="stat-label">Rakenteet</span><span class="stat-value" id="mdStructureCount">0</span></div>
-        <div class="stat"><span class="stat-label">Maastotyypit</span><span class="stat-value" id="mdLandtypeCount">0</span></div>
-        <div class="stat"><span class="stat-label">Esteet</span><span class="stat-value" id="mdBarrierCount">0</span></div>
-        <div class="stat"><span class="stat-label">Korkeustagit</span><span class="stat-value" id="mdElevationCount">0</span></div>
-        <div class="stat"><span class="stat-label">Omat paikat</span><span class="stat-value" id="mdOwnPlaceCount">0</span></div>
-        <div class="stat"><span class="stat-label">Lähin tie/polku</span><span class="stat-value yellow" id="mdRoadDist">–</span></div>
-        <div class="stat"><span class="stat-label">Lähin vesistö</span><span class="stat-value" id="mdWaterDist">–</span></div>
-        <div class="stat"><span class="stat-label">Lähin oma paikka</span><span class="stat-value" id="mdOwnPlaceDist">–</span></div>
-        <div class="stat" id="mdRouteDirStat" style="display:none"><span class="stat-label">Reitin suunta</span><span class="stat-value" id="mdRouteDir">–</span></div>
-        <div class="stat" id="mdUserDirStat" style="display:none"><span class="stat-label">Oma suunta</span><span class="stat-value" id="mdUserDir">–</span></div>
+  <div class="full-view" id="mdLoadPanel" style="display:none" role="region" aria-label="Karttatoiminnot">
+    <div class="view-inner">
+      <div class="view-header"><button class="btn btn-yellow back-btn" type="button" data-back>Takaisin</button><span class="view-title">Karttatoiminnot</span></div>
+      <div class="field"><label for="mdRadiusInput">Lataussäde kilometreinä</label><input type="number" id="mdRadiusInput" value="2" min="0.2" max="10" step="0.1"><span class="hint">Oletus 2 km. Suuri säde voi hidastaa hakua.</span></div>
+      <div class="check-group" role="group" aria-label="Ladattavat aineistot">
+        <label class="check-row"><input type="checkbox" id="mdLoadRoadsCb" checked><span>Tiet ja polut</span></label>
+        <label class="check-row"><input type="checkbox" id="mdLoadWatersCb" checked><span>Vesistöt</span></label>
+        <label class="check-row"><input type="checkbox" id="mdLoadOutdoorCb" checked><span>Retkeilykohteet</span></label>
+        <label class="check-row"><input type="checkbox" id="mdLoadParkingCb" checked><span>Pysäköinti</span></label>
+        <label class="check-row"><input type="checkbox" id="mdLoadStructuresCb" checked><span>Rakennukset ja rakenteet</span></label>
+        <label class="check-row"><input type="checkbox" id="mdLoadLandtypesCb" checked><span>Maastotyypit</span></label>
+        <label class="check-row"><input type="checkbox" id="mdLoadBarriersCb" checked><span>Esteet ja rajoitukset</span></label>
+        <label class="check-row"><input type="checkbox" id="mdLoadElevationsCb" checked><span>Korkeustagit</span></label>
       </div>
+      <button class="btn btn-blue" id="mdLoadCurrentBtn" aria-label="Lataa nykysijainnista">Lataa nykysijainnista</button>
+      <div class="coord-row"><div class="field"><label for="mdLatInput">Pohjoiskoordinaatti</label><input type="text" id="mdLatInput" inputmode="decimal" placeholder="61.200000"></div><div class="field"><label for="mdLonInput">Itäkoordinaatti</label><input type="text" id="mdLonInput" inputmode="decimal" placeholder="24.000000"></div></div>
+      <button class="btn btn-blue" id="mdLoadCoordBtn" aria-label="Lataa koordinaateista">Lataa koordinaateista</button>
+      <div class="btn-row backup-controls" aria-label="Karttadatan varmuuskopiointi"><button class="btn btn-blue" id="mdExportBtn" aria-label="Vie">Vie</button><button class="btn btn-yellow" id="mdImportBtn" aria-label="Tuo">Tuo</button><button class="btn btn-red" id="mdClearBtn" aria-label="Tyhjennä data">Tyhjennä data</button></div>
+      <input type="file" id="mdImportFile" accept="application/json,.json" class="sr-only" aria-hidden="true" tabindex="-1">
+      <div class="save-form" role="region" aria-label="Paikan simulointi"><span class="save-form-title">Paikan simulointi</span><div class="coord-row"><div class="field"><label for="mdSimLatInput">Pohjoiskoordinaatti</label><input type="text" id="mdSimLatInput" inputmode="decimal" placeholder="61.200000"></div><div class="field"><label for="mdSimLonInput">Itäkoordinaatti</label><input type="text" id="mdSimLonInput" inputmode="decimal" placeholder="24.000000"></div></div><button class="btn btn-green" id="mdSimStartBtn">Aloita simulointi</button><div class="small-grid"><button class="btn btn-blue" id="mdSimNorthBtn">Pohjoiseen</button><button class="btn btn-blue" id="mdSimEastBtn">Itään</button><button class="btn btn-blue" id="mdSimSouthBtn">Etelään</button><button class="btn btn-blue" id="mdSimWestBtn">Länteen</button></div><button class="btn btn-red" id="mdSimStopBtn">Lopeta simulointi</button></div>
+      <div><button class="collapsible-btn" id="mdDataInfoBtn" aria-expanded="false" aria-controls="mdDataInfoContent" onclick="toggleCollapsible('mdDataInfoBtn','mdDataInfoContent')"><span>Karttadatan tiedot</span><span class="arrow" aria-hidden="true">&#9660;</span></button><div class="collapsible-content" id="mdDataInfoContent" role="region" aria-labelledby="mdDataInfoBtn"><div class="stats" role="region" aria-label="Karttadatan tiedot"><div class="stat"><span class="stat-label">Omat paikat</span><span class="stat-value" id="mdOwnPlaceCount">0</span></div><div class="stat"><span class="stat-label">GPX</span><span class="stat-value" id="mdGpxCount">0</span></div><div class="stat"><span class="stat-label">Tiet ja polut</span><span class="stat-value" id="mdRoadCount">0</span></div><div class="stat"><span class="stat-label">Vesistöt</span><span class="stat-value" id="mdWaterCount">0</span></div><div class="stat"><span class="stat-label">Retkeilykohteet</span><span class="stat-value" id="mdOutdoorCount">0</span></div><div class="stat"><span class="stat-label">Pysäköinti</span><span class="stat-value" id="mdParkingCount">0</span></div><div class="stat"><span class="stat-label">Rakenteet</span><span class="stat-value" id="mdStructureCount">0</span></div><div class="stat"><span class="stat-label">Maastotyypit</span><span class="stat-value" id="mdLandtypeCount">0</span></div><div class="stat"><span class="stat-label">Esteet</span><span class="stat-value" id="mdBarrierCount">0</span></div><div class="stat"><span class="stat-label">Korkeustagit</span><span class="stat-value" id="mdElevationCount">0</span></div><div class="stat"><span class="stat-label">Lähin tie/polku</span><span class="stat-value yellow" id="mdRoadDist">–</span></div><div class="stat"><span class="stat-label">Lähin vesistö</span><span class="stat-value" id="mdWaterDist">–</span></div><div class="stat"><span class="stat-label">Lähin oma paikka</span><span class="stat-value" id="mdOwnPlaceDist">–</span></div><div class="stat"><span class="stat-label">Lähin GPX</span><span class="stat-value" id="mdGpxDist">–</span></div><div class="stat" id="mdRouteDirStat" style="display:none"><span class="stat-label">Reitin suunta</span><span class="stat-value" id="mdRouteDir">–</span></div><div class="stat" id="mdUserDirStat" style="display:none"><span class="stat-label">Oma suunta</span><span class="stat-value" id="mdUserDir">–</span></div></div></div></div>
     </div>
   </div>
 
-  <div class="hint">Karttadata © OpenStreetMapin tekijät. Tieto voi olla puutteellista, joten sovellus kertoo karttadatasta löytyvän lähimmän kohteen.</div>
+  <div class="full-view" id="mdNotificationsPanel" style="display:none" role="region" aria-label="Ilmoitukset">
+    <div class="view-inner"><div class="view-header"><button class="btn btn-yellow back-btn" type="button" data-back>Takaisin</button><span class="view-title">Ilmoitukset</span></div><p class="hint">Valinta määrää, mistä kategorioista annetaan automaattinen 15 metrin puheilmoitus. Tiet ja polut sekä GPX vaikuttavat myös reitillä/poissa reitiltä -ilmoituksiin.</p><div class="check-group" role="group" aria-label="Ilmoitettavat kategoriat"><label class="check-row"><input type="checkbox" id="mdOwnPlacesCb" checked><span>Omat paikat</span></label><label class="check-row"><input type="checkbox" id="mdGpxCb" checked><span>GPX</span></label><label class="check-row"><input type="checkbox" id="mdRoadsCb" checked><span>Tiet ja polut</span></label><label class="check-row"><input type="checkbox" id="mdWaterCb" checked><span>Vesistöt</span></label><label class="check-row"><input type="checkbox" id="mdOutdoorCb" checked><span>Retkeilykohteet</span></label><label class="check-row"><input type="checkbox" id="mdParkingCb" checked><span>Pysäköinti</span></label><label class="check-row"><input type="checkbox" id="mdStructuresCb" checked><span>Rakennukset ja rakenteet</span></label><label class="check-row"><input type="checkbox" id="mdLandtypesCb" checked><span>Maastotyypit</span></label><label class="check-row"><input type="checkbox" id="mdBarriersCb" checked><span>Esteet ja rajoitukset</span></label><label class="check-row"><input type="checkbox" id="mdElevationsCb" checked><span>Korkeustagit</span></label></div></div>
+  </div>
 
+  <div class="full-view" id="mdNearestPanel" style="display:none" role="region" aria-label="Lähimmät kohteet"><div class="view-inner"><div class="view-header"><button class="btn btn-yellow back-btn" type="button" data-back>Takaisin</button><span class="view-title" id="mdNearestTitle">Lähimmät</span></div><div id="mdNearestList" class="nearest-list" role="list"><p class="places-empty" id="mdNearestEmpty">Ei kohteita.</p></div><button class="btn btn-blue" id="mdNearestMoreBtn" style="display:none">Näytä lisää</button></div></div>
+
+  <div class="full-view" id="mdOwnPlacesPanel" style="display:none" role="region" aria-label="Omat paikat"><div class="view-inner"><div class="view-header"><button class="btn btn-yellow back-btn" type="button" data-back>Takaisin</button><span class="view-title">Omat paikat</span></div><div id="mdOwnPlacesList" class="places-list" role="list"><p class="places-empty" id="mdOwnPlacesEmpty">Ei tallennettuja omia paikkoja.</p></div></div></div>
+
+  <div class="full-view" id="mdGpxPanel" style="display:none" role="region" aria-label="GPX"><div class="view-inner"><div class="view-header"><button class="btn btn-yellow back-btn" type="button" data-back>Takaisin</button><span class="view-title">GPX</span></div><input type="file" id="mdGpxImportFile" accept=".gpx,application/gpx+xml" class="sr-only" aria-hidden="true" tabindex="-1"><div class="btn-row"><button class="btn btn-blue" id="mdGpxImportBtn">Tuo GPX</button><button class="btn btn-yellow" id="mdGpxExportBtn">Vie GPX</button></div><button class="btn btn-green" id="mdGpxRecordBtn">Tallenna reitti</button><div id="mdGpxList" class="places-list" role="list"><p class="places-empty" id="mdGpxEmpty">Ei GPX-reittejä.</p></div></div></div>
+
+  <div class="save-form" id="mdSavePlaceForm" style="display:none" role="region" aria-label="Tallenna oma paikka"><span class="save-form-title" id="mdSavePlaceTitle">Tallenna oma paikka</span><div class="field"><label for="mdPlaceName">Paikan nimi</label><input type="text" id="mdPlaceName" placeholder="Kirjoita nimi…" autocomplete="off" autocorrect="off" spellcheck="false"></div><div class="coord-row"><div class="field"><label for="mdPlaceLat">Pohjoiskoordinaatti</label><input type="text" id="mdPlaceLat" inputmode="decimal" placeholder="61.200000"></div><div class="field"><label for="mdPlaceLon">Itäkoordinaatti</label><input type="text" id="mdPlaceLon" inputmode="decimal" placeholder="24.000000"></div></div><div class="btn-row"><button class="btn btn-green" id="mdPlaceOkBtn">OK</button><button class="btn btn-red" id="mdPlaceCancelBtn">Peruuta</button></div></div>
 </section>
 </main>
 
@@ -662,96 +574,27 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
     <div id="helpBody">
 
       <h4>Yleistä</h4>
-      <p>Sovellus koostuu kolmesta välilehdestä: Seuranta, Tallennin ja Kartta ja paikat.
-         Kaikki toiminnot ovat käytettävissä kosketusnäytöllä sekä
-         täysin näppäimistön ja ruudunlukijan avulla.
-         Sovellus on testattu VoiceOverin kanssa (iOS) ja
-         suunniteltu toimimaan myös TalkBackin kanssa (Android).</p>
-      <p>Sovellus toimii offline-tilassa sen jälkeen, kun se on kerran
-         avattu verkkoyhteyden alueella. Lisäämällä sovellus
-         puhelimen kotivalikkoon saat luotettavimman offline-kokemuksen.</p>
+      <p>Sovelluksen perusnäkymä on Kartta ja paikat. GPS-seuranta, karttadata, omat paikat ja GPX-reitit ovat samassa näkymässä.</p>
+      <p>Alisivut avautuvat koko näytön näkymiksi. Palaa perusnäkymään Takaisin-painikkeella.</p>
 
-      <h4>Reittiseuranta</h4>
-      <p>Lataa GPX-tiedosto Lataa GPX-tiedosto -painikkeesta.
-         Tiedoston tulee sisältää trkpt- tai wpt-pisteitä.
-         Paina Aloita seuranta käynnistääksesi GPS-seurannan.</p>
-      <p>Sovellus antaa peruspalautteen äänimerkeillä. Reitillä olon
-         merkiksi kuuluu kaksi pehmeää puukopautusta heti reitille palattaessa
-         ja sen jälkeen noin 20 sekunnin välein. Poissa reitiltä kuuluu
-         pehmeä kilahdus heti reitiltä poistuttaessa ja sen jälkeen noin
-         20 sekunnin välein.</p>
-      <p>Jos Reitti-ilmoitukset puheella on päällä, poissa reitiltä -äänimerkin
-         jälkeen sovellus kertoo etäisyyden ja suunnan lähimpään reittipisteeseen,
-         esimerkiksi 25 metriä lounaaseen.</p>
+      <h4>GPS-seuranta</h4>
+      <p>Aloita GPS-seuranta -painike käynnistää sijainnin seurannan. Reitillä tai tiellä ollessa kuuluu puukopautus. Poissa reitiltä sovellus kertoo etäisyyden ja ilmansuunnan lähimpään valittuun reittiin, tiehen tai polkuun.</p>
 
-      <h4>Äänipalautetoiminnot</h4>
-      <p>Reitti-ilmoitukset puheella: jos valinta on päällä, sovellus kertoo
-         poissa reitiltä -äänimerkin jälkeen etäisyyden ja suunnan lähimpään
-         reittipisteeseen. Jos valinta on pois päältä, reitillä- ja poissa
-         reitiltä -äänimerkit kuuluvat silti.</p>
-      <p>Kerro reitin kulkusuunta: sovellus tarkastelee lähintä reittipistettä
-         ja reittiä noin 20 metriä molempiin suuntiin. Suunta ilmoitetaan
-         tallennussuunnasta riippumattomana akselina, esimerkiksi
-         etelä-pohjoinen tai luode-kaakko. Ilmoitus annetaan aluksi ja kun
-         reitin suunta muuttuu.</p>
-      <p>Kerro oma liikkumissuunta: sovellus kertoo, mihin ilmansuuntaan
-         liikut. Tieto perustuu GPS:n heading-arvoon ja edellyttää liikettä.
-         Ilmoitus annetaan aluksi ja kun liikkumissuunta muuttuu.</p>
-      <p>Kerro tulevat käännökset: sovellus ilmoittaa alle 15 metrin
-         päässä olevan käännöksen. Käännös ilmoitetaan kerran.
-         Sovellus tunnistaa kulkusuunnan ja kääntää vasen/oikea
-         oikein myös silloin, kun kuljet reittiä vastakkaiseen suuntaan
-         kuin se on tallennettu. Paikallaan oltaessa ei ilmoituksia.</p>
+      <h4>Karttatoiminnot</h4>
+      <p>Karttatoiminnot-sivulla voit ladata OpenStreetMap-aineistoa nykysijainnista tai koordinaateista. Voit valita lataussäteen ja ladattavat kategoriat. Uusi aineisto lisätään aiempaan.</p>
+      <p>Samalla sivulla ovat Vie, Tuo, Tyhjennä data, paikan simulointi ja Karttadatan tiedot.</p>
 
-      <h4>Lisäasetukset</h4>
-      <p>Sallittu poikkeama määrittää, kuinka kaukana reitistä saa olla
-         ennen kuin sovellus tulkitsee käyttäjän olevan poissa reitiltä
-         (5–20 m, oletus 7 m). GPS-päivitysväli määrittää kuinka usein
-         sijainti tarkistetaan. Puheen nopeus säätää sovelluksen oman
-         puheen nopeuden (100 = normaali, 110 = oletusarvo).</p>
+      <h4>Ilmoitukset</h4>
+      <p>Ilmoitukset-sivulla valitaan kategoriat, joista annetaan automaattinen 15 metrin puheilmoitus. Tiet ja polut sekä GPX käyttävät lisäksi reitillä/poissa reitiltä -ilmoitustapaa.</p>
 
-      <h4>Tallennin</h4>
-      <p>Tallentaa kuljetun reitin GPX-tiedostoksi. Paina Aloita tallennus,
-         kävele reitti ja paina Lopeta ja lataa GPX. Tiedosto tallennetaan
-         laitteelle automaattisesti. Tallennus voidaan asettaa tauolle
-         ja jatkaa myöhemmin. Sovellus varoittaa, jos sivu yritetään
-         sulkea kesken tallennuksen.</p>
-      <p>Kun tallennus on käynnissä, sovellus kertoo liikkumissuuntasi
-         puheella 30 sekunnin välein (esim. "Kuljet pohjoiseen").
-         Ilmoituksen nopeus on 110 %.</p>
+      <h4>Omat paikat ja GPX</h4>
+      <p>Tallenna sijainti lisää oman paikan. Omat paikat -sivulla paikkoja voi muokata ja poistaa. GPX-sivulla voi tuoda, viedä ja tallentaa reittejä. Reitin tallennuksessa GPS-päivitysväli on kiinteä 5 sekuntia.</p>
 
-      <h4>Kartta ja paikat</h4>
-      <p>Kartta ja paikat-välilehdellä voit ladata OpenStreetMap-aineistoa
-         nykyisen sijainnin tai annettujen koordinaattien ympäriltä
-         2 kilometrin säteellä. Lataus hakee tiet, polut, vesistöt, retkeilykohteet, rakennukset ja rakenteet, maastotyypit, esteet ja rajoitukset sekä OSM:n korkeustagit.
-         Uusi haku lisätään aina aiemmin ladattuun aineistoon, eikä
-         aiempaa dataa korvata.</p>
-      <p>Paina Lataa kartta avataksesi latausvalinnat. Voit ladata kartan
-         nykysijainnista tai kirjoittaa koordinaatit ja ladata kartan niiden
-         perusteella verkkoyhteyden aikana. Vie-, Tuo- ja Tyhjennä data
-         -painikkeilla voit varmuuskopioida, palauttaa tai poistaa paikallisesti
-         tallennetun karttadatan ja omat paikat.</p>
-      <p>Paina Aloita GPS-seuranta käynnistääksesi seurannan. Jos Tiet ja polut
-         on valittuna, sovellus vertaa sijaintiasi lähimpään karttadatasta
-         löytyvään tiehen tai polkuun. Tällä välilehdellä reittitoleranssi
-         on kiinteä 7 metriä. Tiellä tai polulla ollessa kuuluu puukopautus.
-         Poissa tieltä tai polulta sovellus kertoo aina puheella lähimmän
-         tien tai polun etäisyyden ja suunnan. Reitin suunta ja oma
-         liikkumissuunta lisätään puheeseen, jos niiden valinnat ovat päällä.</p>
-      <p>Vesistöt-valinnalla sovellus näyttää ja ilmoittaa lähimmän
-         karttadatasta löytyvän vesikohteen, kuten puron, joen, ojan,
-         lammen tai järven. Sovellus ilmoittaa myös 15 metrin päässä
-         lähestyvästä tie- tai polkuristeyksestä, vesistön kanssa
-         risteämisestä sekä omista tallennetuista paikoista. Nämä ilmoitukset
-         annetaan aina puheella ja ne nollautuvat, kun poistut 15 metrin
-         alueelta.</p>
+      <h4>Kategoriat</h4>
+      <p>Kategoriapainikkeet avaavat listan lähimmistä kohteista. Aluksi näytetään 20 kohdetta, ja Näytä lisää avaa lisää.</p>
 
       <h4>Saavutettavuus</h4>
-      <p>Kaikki painikkeet ja valintalaatikot ovat saavutettavissa
-         ruudunlukijalla. Reittiseurannan jatkuva palaute annetaan ensisijaisesti
-         sovelluksen omilla äänimerkeillä ja puheella. Jatkuvasti päivittyvät
-         tilastot (pisteiden määrä, aika, matka ja GPS-tiedot) päivitetään
-         hiljaa ruudulla häiritsemättä ruudunlukijaa.</p>
+      <p>Automaattiset maastoilmoitukset annetaan sovelluksen omalla puheella, jotta VoiceOver ei puhu samoja ilmoituksia päällekkäin.</p>
 
     </div>
     <div class="controls modal-close">
@@ -2312,7 +2155,7 @@ function mdGroupConfig(key) {
 
 function mdShowNearestGroup(key) {
   mdState.nearestGroupKey = key;
-  mdState.nearestGroupLimit = 10;
+  mdState.nearestGroupLimit = 20;
   mdRenderNearestGroup();
 }
 
@@ -2331,7 +2174,7 @@ function mdRenderNearestGroup() {
     return;
   }
   const all = cfg.cb && !cfg.cb.checked ? [] : mdTopNearestFeatures(cfg.list, lat, lon, Infinity);
-  const list = all.slice(0, mdState.nearestGroupLimit || 10);
+  const list = all.slice(0, mdState.nearestGroupLimit || 20);
   if (!list.length) {
     mdNearestEmpty.textContent = 'Ei kohteita.';
     mdNearestEmpty.style.display = '';
@@ -2632,6 +2475,7 @@ function mdHandlePosition(pos) {
   if (heading != null && !isNaN(heading)) mdState.currentHeading = heading;
 
   mdHandleRoads(lat, lon);
+  mdHandleGpx(lat, lon);
   mdHandleWaters(lat, lon);
   mdMaybeWaterProximityAnnouncement(lat, lon);
   mdMaybeCategoryProximityAnnouncements(lat, lon);
@@ -2641,6 +2485,235 @@ function mdHandlePosition(pos) {
   mdRenderOwnPlaces();
   if (mdNearestPanel.style.display !== 'none' && mdState.nearestGroupKey) mdRenderNearestGroup();
 }
+
+
+
+/* === Uuden perusnäkymän lisälogiikka: alisivut, GPX, pysäköinti, simulointi === */
+function mdOpenFullView(el) {
+  if (!el) return;
+  el.style.display = '';
+  const back = el.querySelector('[data-back]');
+  if (back) setTimeout(() => back.focus(), 30);
+}
+function mdCloseFullViews() {
+  document.querySelectorAll('.full-view').forEach(v => v.style.display = 'none');
+}
+document.querySelectorAll('[data-back]').forEach(btn => btn.addEventListener('click', mdCloseFullViews));
+if (document.getElementById('mdNotificationsBtn')) {
+  document.getElementById('mdNotificationsBtn').addEventListener('click', () => mdOpenFullView(document.getElementById('mdNotificationsPanel')));
+}
+
+mdState.parking = mdState.parking || [];
+mdState.gpxRoutes = mdState.gpxRoutes || [];
+mdState.nextGpxId = mdState.nextGpxId || 1;
+mdState.lastOnGpx = null;
+mdState.lastGpxSoundTime = 0;
+mdState.lastOffGpxSoundTime = 0;
+mdState.gpxRecording = false;
+mdState.gpxRecordPoints = [];
+mdState.gpxRecordTimer = null;
+mdState.simulationMode = false;
+
+function mdRadiusMeters() {
+  const el = document.getElementById('mdRadiusInput');
+  const km = Math.max(0.2, Math.min(10, Number(el && el.value ? el.value : 2)));
+  return Math.round(km * 1000);
+}
+function mdLoadOpt(id) { const el = document.getElementById(id); return !el || el.checked; }
+
+mdOverpassQuery = function(lat, lon) {
+  const r = mdRadiusMeters();
+  const parts = [];
+  if (mdLoadOpt('mdLoadRoadsCb')) parts.push(`way(around:${r},${lat},${lon})["highway"];`);
+  if (mdLoadOpt('mdLoadWatersCb')) parts.push(`way(around:${r},${lat},${lon})["waterway"]; way(around:${r},${lat},${lon})["natural"="water"]; relation(around:${r},${lat},${lon})["natural"="water"]; relation(around:${r},${lat},${lon})["water"];`);
+  if (mdLoadOpt('mdLoadOutdoorCb')) parts.push(`node(around:${r},${lat},${lon})["tourism"]; way(around:${r},${lat},${lon})["tourism"]; node(around:${r},${lat},${lon})["amenity"~"^(shelter|bench|toilets|drinking_water)$"]; way(around:${r},${lat},${lon})["amenity"~"^(shelter|bench|toilets|drinking_water)$"]; node(around:${r},${lat},${lon})["leisure"~"^(picnic_table|firepit)$"]; way(around:${r},${lat},${lon})["leisure"~"^(picnic_table|firepit)$"]; node(around:${r},${lat},${lon})["information"]; way(around:${r},${lat},${lon})["information"];`);
+  if (mdLoadOpt('mdLoadParkingCb')) parts.push(`node(around:${r},${lat},${lon})["amenity"="parking"]; way(around:${r},${lat},${lon})["amenity"="parking"]; relation(around:${r},${lat},${lon})["amenity"="parking"];`);
+  if (mdLoadOpt('mdLoadStructuresCb')) parts.push(`node(around:${r},${lat},${lon})["building"]; way(around:${r},${lat},${lon})["building"]; node(around:${r},${lat},${lon})["man_made"]; way(around:${r},${lat},${lon})["man_made"];`);
+  if (mdLoadOpt('mdLoadLandtypesCb')) parts.push(`way(around:${r},${lat},${lon})["natural"~"^(wood|scrub|heath|grassland|bare_rock|wetland|cliff)$"]; relation(around:${r},${lat},${lon})["natural"~"^(wood|scrub|heath|grassland|bare_rock|wetland|cliff)$"]; way(around:${r},${lat},${lon})["landuse"~"^(forest|meadow|farmland|grass|orchard|residential|industrial|cemetery)$"]; relation(around:${r},${lat},${lon})["landuse"~"^(forest|meadow|farmland|grass|orchard|residential|industrial|cemetery)$"];`);
+  if (mdLoadOpt('mdLoadBarriersCb')) parts.push(`node(around:${r},${lat},${lon})["barrier"]; way(around:${r},${lat},${lon})["barrier"]; node(around:${r},${lat},${lon})["access"~"^(private|no|permissive|destination)$"]; way(around:${r},${lat},${lon})["access"~"^(private|no|permissive|destination)$"];`);
+  if (mdLoadOpt('mdLoadElevationsCb')) parts.push(`node(around:${r},${lat},${lon})["ele"]; way(around:${r},${lat},${lon})["ele"];`);
+  if (!parts.length) parts.push(`way(around:${r},${lat},${lon})["highway"];`);
+  return `[out:json][timeout:35];\n(\n${parts.join('\n')}\n);\nout body geom;`;
+};
+
+function mdParseOverpassExtended(json) {
+  const base = mdParseOverpassOriginal(json);
+  const parking = [];
+  const filteredOutdoor = [];
+  for (const f of base.outdoor || []) {
+    if (f.tags && f.tags.amenity === 'parking') parking.push({ ...f, kind:'parking', typeText:'pysäköinti' });
+    else filteredOutdoor.push(f);
+  }
+  base.outdoor = filteredOutdoor;
+  base.parking = parking;
+  return base;
+}
+const mdParseOverpassOriginal = mdParseOverpass;
+mdParseOverpass = mdParseOverpassExtended;
+
+mdMergeParsedData = function(parsed, center) {
+  const roadMerge = mdMergeFeatureLists(mdState.roads, parsed.roads || []);
+  const waterMerge = mdMergeFeatureLists(mdState.waters, parsed.waters || []);
+  const outdoorMerge = mdMergeFeatureLists(mdState.outdoor, parsed.outdoor || []);
+  const parkingMerge = mdMergeFeatureLists(mdState.parking, parsed.parking || []);
+  const structureMerge = mdMergeFeatureLists(mdState.structures, parsed.structures || []);
+  const landtypeMerge = mdMergeFeatureLists(mdState.landtypes, parsed.landtypes || []);
+  const barrierMerge = mdMergeFeatureLists(mdState.barriers, parsed.barriers || []);
+  const elevationMerge = mdMergeFeatureLists(mdState.elevations, parsed.elevations || []);
+  mdState.roads = roadMerge.list; mdState.waters = waterMerge.list; mdState.outdoor = outdoorMerge.list; mdState.parking = parkingMerge.list;
+  mdState.structures = structureMerge.list; mdState.landtypes = landtypeMerge.list; mdState.barriers = barrierMerge.list; mdState.elevations = elevationMerge.list;
+  mdState.loadedAt = new Date().toISOString(); mdState.center = center; mdState.centers.push(center);
+  mdSaveStoredData(); mdUpdateCounts();
+  return { addedRoads: roadMerge.added, addedWaters: waterMerge.added, addedOutdoor: outdoorMerge.added, addedParking: parkingMerge.added, addedStructures: structureMerge.added, addedLandtypes: landtypeMerge.added, addedBarriers: barrierMerge.added, addedElevations: elevationMerge.added };
+};
+
+mdSaveStoredData = function() {
+  const data = { roads: mdState.roads, waters: mdState.waters, outdoor: mdState.outdoor, parking: mdState.parking, structures: mdState.structures, landtypes: mdState.landtypes, barriers: mdState.barriers, elevations: mdState.elevations, gpxRoutes: mdState.gpxRoutes, loadedAt: mdState.loadedAt, center: mdState.center, centers: mdState.centers, ownPlaces: mdState.ownPlaces };
+  try { localStorage.setItem(MD_STORAGE_KEY, JSON.stringify(data)); } catch(e) { announce('Karttadata ladattiin, mutta tallennus selaimeen epäonnistui.'); }
+};
+
+mdLoadStoredData = function() {
+  try {
+    let raw = localStorage.getItem(MD_STORAGE_KEY) || localStorage.getItem('gpxAppMaastodataV1');
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    mdState.roads = Array.isArray(data.roads) ? data.roads : [];
+    mdState.waters = Array.isArray(data.waters) ? data.waters : [];
+    mdState.outdoor = Array.isArray(data.outdoor) ? data.outdoor : [];
+    mdState.parking = Array.isArray(data.parking) ? data.parking : [];
+    mdState.structures = Array.isArray(data.structures) ? data.structures : [];
+    mdState.landtypes = Array.isArray(data.landtypes) ? data.landtypes : [];
+    mdState.barriers = Array.isArray(data.barriers) ? data.barriers : [];
+    mdState.elevations = Array.isArray(data.elevations) ? data.elevations : [];
+    mdState.gpxRoutes = Array.isArray(data.gpxRoutes) ? data.gpxRoutes : [];
+    mdState.nextGpxId = mdState.gpxRoutes.reduce((m,p)=>Math.max(m, Number(p.id)||0), 0) + 1;
+    mdState.ownPlaces = Array.isArray(data.ownPlaces) ? data.ownPlaces : [];
+    mdState.nextOwnPlaceId = mdState.ownPlaces.reduce((m,p)=>Math.max(m, Number(p.id)||0), 0) + 1;
+    mdState.loadedAt = data.loadedAt || null; mdState.center = data.center || null; mdState.centers = Array.isArray(data.centers) ? data.centers : (data.center ? [data.center] : []);
+    mdUpdateCounts(); mdRenderGpxList();
+  } catch(e) { console.warn('Kartta ja paikat muistista epäonnistui:', e); }
+};
+
+const mdUpdateCountsOriginal = mdUpdateCounts;
+mdUpdateCounts = function() {
+  mdUpdateCountsOriginal();
+  const pc = document.getElementById('mdParkingCount'); if (pc) pc.textContent = (mdState.parking || []).length;
+  const gc = document.getElementById('mdGpxCount'); if (gc) gc.textContent = (mdState.gpxRoutes || []).length;
+};
+
+
+mdImportDataFromObject = function(data) {
+  if (!data || !Array.isArray(data.roads) || !Array.isArray(data.waters)) throw new Error('Tiedosto ei sisällä kelvollista karttadataa.');
+  const merged = mdMergeParsedData({ roads:data.roads||[], waters:data.waters||[], outdoor:data.outdoor||[], parking:data.parking||[], structures:data.structures||[], landtypes:data.landtypes||[], barriers:data.barriers||[], elevations:data.elevations||[] }, data.center || null);
+  if (Array.isArray(data.ownPlaces)) {
+    const seen = new Map(mdState.ownPlaces.map(p => [String(p.id || (p.name + ':' + p.lat + ':' + p.lon)), p]));
+    for (const p of data.ownPlaces) { const key = String(p.id || (p.name + ':' + p.lat + ':' + p.lon)); if (!seen.has(key)) seen.set(key, { id:Number(p.id)||mdState.nextOwnPlaceId++, name:String(p.name||'Oma paikka'), lat:Number(p.lat), lon:Number(p.lon) }); }
+    mdState.ownPlaces = Array.from(seen.values()).filter(p=>!isNaN(p.lat)&&!isNaN(p.lon)); mdState.nextOwnPlaceId = mdState.ownPlaces.reduce((m,p)=>Math.max(m,Number(p.id)||0),0)+1;
+  }
+  if (Array.isArray(data.gpxRoutes)) { const seen = new Map(mdState.gpxRoutes.map(r => [String(r.id || r.name), r])); for(const r of data.gpxRoutes){ const key=String(r.id||r.name); if(!seen.has(key) && Array.isArray(r.coords)) seen.set(key, { ...r, id:Number(r.id)||mdState.nextGpxId++, kind:'gpx', typeText:'GPX-reitti' }); } mdState.gpxRoutes = Array.from(seen.values()); mdState.nextGpxId = mdState.gpxRoutes.reduce((m,p)=>Math.max(m,Number(p.id)||0),0)+1; }
+  if (Array.isArray(data.centers)) mdState.centers = mdState.centers.concat(data.centers);
+  mdSaveStoredData(); mdUpdateCounts(); mdRenderOwnPlaces(); mdRenderGpxList();
+  announce('Data tuotu.');
+};
+mdClearData = function() {
+  mdState.roads=[]; mdState.waters=[]; mdState.outdoor=[]; mdState.parking=[]; mdState.structures=[]; mdState.landtypes=[]; mdState.barriers=[]; mdState.elevations=[]; mdState.ownPlaces=[]; mdState.gpxRoutes=[]; mdState.nextOwnPlaceId=1; mdState.nextGpxId=1; mdState.loadedAt=null; mdState.center=null; mdState.centers=[]; mdState.lastNearestRoad=null; mdState.crossingInside={}; mdState.ownPlaceInside={}; mdState.categoryInside={};
+  try { localStorage.removeItem(MD_STORAGE_KEY); } catch(e) {}
+  mdUpdateCounts(); mdRenderOwnPlaces(); mdRenderGpxList(); mdRoadDist.textContent='–'; mdWaterDist.textContent='–'; const gd=document.getElementById('mdGpxDist'); if(gd) gd.textContent='–'; mdSetRoadBox('Data tyhjennetty.',''); mdSetWaterBox('Data tyhjennetty.',''); const gs=document.getElementById('mdGpxStatus'); if(gs) gs.textContent='Data tyhjennetty.'; if(mdOwnPlaceStatus) mdOwnPlaceStatus.textContent='Ei omia paikkoja tallennettuna.'; if(mdOwnPlaceDist) mdOwnPlaceDist.textContent='–'; mdSetBanner('Data tyhjennetty.','idle'); announce('Data tyhjennetty.');
+};
+
+mdFetchAndMergeAt = async function(lat, lon, sourceText) {
+  const radius = mdRadiusMeters();
+  mdSetBanner('Ladataan karttaa ' + (radius/1000).toFixed(radius % 1000 ? 1 : 0) + ' km säteeltä…', 'running');
+  announce('Ladataan karttaa.');
+  const body = 'data=' + encodeURIComponent(mdOverpassQuery(lat, lon));
+  const res = await fetch('https://overpass-api.de/api/interpreter', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'}, body });
+  if (!res.ok) throw new Error('Overpass-palvelin palautti virheen ' + res.status);
+  const parsed = mdParseOverpass(await res.json());
+  const merged = mdMergeParsedData(parsed, { lat, lon, radius, source: sourceText || 'haku' });
+  announce('Kartta lisätty. Uusia kohteita ' + (merged.addedRoads + merged.addedWaters + merged.addedOutdoor + merged.addedParking + merged.addedStructures + merged.addedLandtypes + merged.addedBarriers + merged.addedElevations) + '.');
+};
+
+mdExportData = function() {
+  const data = { version:2, source:'OpenStreetMap / Overpass', exportedAt:new Date().toISOString(), loadedAt:mdState.loadedAt, center:mdState.center, centers:mdState.centers, roads:mdState.roads, waters:mdState.waters, outdoor:mdState.outdoor, parking:mdState.parking, structures:mdState.structures, landtypes:mdState.landtypes, barriers:mdState.barriers, elevations:mdState.elevations, ownPlaces:mdState.ownPlaces, gpxRoutes:mdState.gpxRoutes };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download='kartta_ja_paikat_'+new Date().toISOString().slice(0,19).replace(/:/g,'-')+'.json'; document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(()=>URL.revokeObjectURL(url),5000); announce('Data viety.');
+};
+
+function mdGroupConfigExtended(key) {
+  if (key === 'parking') return { title:'Pysäköinti', list:mdState.parking || [], cb:document.getElementById('mdParkingCb') };
+  if (key === 'gpx') return { title:'GPX', list:mdState.gpxRoutes || [], cb:document.getElementById('mdGpxCb') };
+  const cfg = mdGroupConfigOriginal(key);
+  return cfg;
+}
+const mdGroupConfigOriginal = mdGroupConfig;
+mdGroupConfig = mdGroupConfigExtended;
+
+const mdShowNearestGroupOriginal = mdShowNearestGroup;
+mdShowNearestGroup = function(key) { mdState.nearestGroupKey = key; mdState.nearestGroupLimit = 20; mdRenderNearestGroup(); mdOpenFullView(mdNearestPanel); };
+
+function mdTopNearestGpx(lat, lon) { return mdTopNearestFeatures(mdState.gpxRoutes || [], lat, lon, Infinity); }
+function mdMaybeGpxAudio(isOnRoute, distanceText, directionText, routeAxisText, userDirText) {
+  const now = Date.now(); const stateChanged = mdState.lastOnGpx !== isOnRoute;
+  if (isOnRoute) {
+    if (stateChanged || now - mdState.lastGpxSoundTime >= MD_ANNOUNCE_INTERVAL_MS) { playKnock(); mdState.lastGpxSoundTime = now; const parts=[]; if(routeAxisText) parts.push('Reitin suunta '+routeAxisText); if(userDirText) parts.push('kuljet '+userDirText); if(parts.length) mdSpeak(parts.join(', ') + '.', 350); }
+  } else {
+    if (stateChanged || now - mdState.lastOffGpxSoundTime >= MD_ANNOUNCE_INTERVAL_MS) { playOffRouteChime(); const parts=[distanceText + ' ' + directionText]; if(routeAxisText) parts.push('reitin suunta '+routeAxisText); if(userDirText) parts.push('kuljet '+userDirText); mdSpeak(parts.join(', ') + '.', 450); mdState.lastOffGpxSoundTime = now; }
+  }
+  mdState.lastOnGpx = isOnRoute;
+}
+function mdHandleGpx(lat, lon) {
+  const cb = document.getElementById('mdGpxCb');
+  const distEl = document.getElementById('mdGpxDist');
+  const statusEl = document.getElementById('mdGpxStatus');
+  if (!cb || !cb.checked) { if(distEl) distEl.textContent='–'; if(statusEl) statusEl.textContent='GPX-ilmoitukset pois käytöstä.'; return; }
+  const nearest = mdNearestFeature(mdState.gpxRoutes || [], lat, lon);
+  if (!nearest) { if(distEl) distEl.textContent='–'; if(statusEl) statusEl.textContent='Ei GPX-reittiä.'; return; }
+  const distText = Math.round(nearest.distance) + ' m';
+  const dir = degToText(bearingDeg(lat, lon, nearest.closestLat, nearest.closestLon));
+  const onRoute = nearest.distance <= MD_ROUTE_THRESHOLD_M;
+  if(distEl) distEl.textContent = distText;
+  if(statusEl) statusEl.textContent = onRoute ? 'Olet GPX-reitillä: ' + mdFeatureName(nearest.feature) + '. Poikkeama ' + distText + '.' : 'GPX-reitti: ' + mdFeatureName(nearest.feature) + ', ' + distText + ' ' + dir + '.';
+  let routeAxisForSpeech = '';
+  if (mdRouteDirCb.checked && nearest.segmentBearing != null) routeAxisForSpeech = axisToText(nearest.segmentBearing) || '';
+  let userDirForSpeech = '';
+  if (mdUserDirCb.checked) { const heading = mdState.currentHeading; userDirForSpeech = heading != null && !isNaN(heading) ? degToText(heading) : ''; }
+  mdMaybeGpxAudio(onRoute, distText, dir, routeAxisForSpeech, userDirForSpeech);
+}
+
+function mdParseGpxText(text, fallbackName) {
+  const xml = new DOMParser().parseFromString(text, 'application/xml');
+  if (xml.querySelector('parsererror')) throw new Error('GPX-tiedosto on viallinen.');
+  let pts = [...xml.getElementsByTagName('trkpt')];
+  if (!pts.length) pts = [...xml.getElementsByTagName('rtept')];
+  if (!pts.length) pts = [...xml.getElementsByTagName('wpt')];
+  const coords = pts.map(p => ({ lat:parseFloat(p.getAttribute('lat')), lon:parseFloat(p.getAttribute('lon')) })).filter(p => !isNaN(p.lat) && !isNaN(p.lon));
+  if (coords.length < 2) throw new Error('GPX-reitissä ei ole tarpeeksi pisteitä.');
+  const nameEl = xml.getElementsByTagName('name')[0];
+  return { id: mdState.nextGpxId++, name: (nameEl && nameEl.textContent.trim()) || fallbackName || 'GPX-reitti', tags:{}, coords, kind:'gpx', typeText:'GPX-reitti' };
+}
+async function mdImportGpxFile(file) { if(!file) return; try { const route = mdParseGpxText(await file.text(), file.name.replace(/\.gpx$/i,'')); mdState.gpxRoutes.push(route); mdSaveStoredData(); mdUpdateCounts(); mdRenderGpxList(); announce('GPX tuotu.'); } catch(e) { announce('GPX-tuonti epäonnistui.'); mdSetBanner('GPX-tuonti epäonnistui: '+e.message, 'error'); } }
+function mdBuildGpx(route) { let g='<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="GPX-sovellus" xmlns="http://www.topografix.com/GPX/1/1">\n<trk><name>'+String(route.name).replace(/[<>&]/g,'')+'</name><trkseg>\n'; for(const p of route.coords) g+='<trkpt lat="'+p.lat.toFixed(7)+'" lon="'+p.lon.toFixed(7)+'"></trkpt>\n'; return g+'</trkseg></trk>\n</gpx>'; }
+function mdExportGpxRoutes() { if(!mdState.gpxRoutes.length){announce('Ei GPX-reittejä.');return;} const content = mdState.gpxRoutes.map(mdBuildGpx).join('\n'); const blob=new Blob([content],{type:'application/gpx+xml'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='gpx_reitit_'+new Date().toISOString().slice(0,19).replace(/:/g,'-')+'.gpx'; document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(()=>URL.revokeObjectURL(url),5000); }
+function mdRenderGpxList() { const list=document.getElementById('mdGpxList'), empty=document.getElementById('mdGpxEmpty'); if(!list) return; [...list.querySelectorAll('.place-item')].forEach(el=>el.remove()); if(empty) empty.style.display=mdState.gpxRoutes.length?'none':''; for(const r of mdState.gpxRoutes){ const item=document.createElement('div'); item.className='place-item'; item.setAttribute('role','listitem'); const info=document.createElement('div'); info.className='place-item-info'; const n=document.createElement('div'); n.className='place-item-name'; n.textContent=r.name; const d=document.createElement('div'); d.className='place-item-dist'; d.textContent=(r.coords||[]).length+' pistettä'; info.appendChild(n); info.appendChild(d); const edit=document.createElement('button'); edit.className='place-item-edit'; edit.textContent='Muokkaa'; edit.onclick=()=>{ const name=prompt('Reitin nimi', r.name); if(name){r.name=name.trim()||r.name; mdSaveStoredData(); mdRenderGpxList();}}; const del=document.createElement('button'); del.className='place-item-del'; del.textContent='Poista'; del.onclick=()=>{ mdState.gpxRoutes=mdState.gpxRoutes.filter(x=>x.id!==r.id); mdSaveStoredData(); mdUpdateCounts(); mdRenderGpxList();}; item.appendChild(info); item.appendChild(edit); item.appendChild(del); list.appendChild(item);} }
+function mdStartStopGpxRecording() { const btn=document.getElementById('mdGpxRecordBtn'); if(!mdState.gpxRecording){ if(!navigator.geolocation){announce('Paikannusta ei tueta.');return;} mdState.gpxRecording=true; mdState.gpxRecordPoints=[]; btn.textContent='Lopeta reitin tallennus'; const fetchPoint=()=>navigator.geolocation.getCurrentPosition(pos=>{ const c=pos.coords; mdState.gpxRecordPoints.push({lat:c.latitude, lon:c.longitude}); }, err=>announce('GPS-virhe.'), mdGeoOptions()); fetchPoint(); mdState.gpxRecordTimer=setInterval(fetchPoint, 5000); announce('Reitin tallennus käynnistetty.'); } else { clearInterval(mdState.gpxRecordTimer); mdState.gpxRecording=false; btn.textContent='Tallenna reitti'; if(mdState.gpxRecordPoints.length>=2){ mdState.gpxRoutes.push({id:mdState.nextGpxId++, name:'Tallennettu reitti '+new Date().toISOString().slice(0,10), tags:{}, coords:mdState.gpxRecordPoints, kind:'gpx', typeText:'GPX-reitti'}); mdSaveStoredData(); mdUpdateCounts(); mdRenderGpxList(); announce('Reitti tallennettu GPX-kategoriaan.'); } else announce('Pisteitä ei ollut tarpeeksi.'); } }
+
+function mdSimSet(lat, lon, heading) { mdState.simulationMode=true; mdState.currentLat=lat; mdState.currentLon=lon; if(heading!=null) mdState.currentHeading=heading; mdHandleRoads(lat, lon); mdHandleGpx(lat, lon); mdHandleWaters(lat, lon); mdHandleUserDirection(); mdMaybeOwnPlaceAnnouncements(lat, lon); mdHandleOwnPlaceDisplay(lat, lon); mdRenderOwnPlaces(); mdRenderGpxList(); if (mdNearestPanel.style.display !== 'none') mdRenderNearestGroup(); mdSetBanner('Simulointi käynnissä.', 'paused'); }
+function mdMoveSim(dir) { const lat=mdState.currentLat, lon=mdState.currentLon; if(lat==null||lon==null){announce('Anna simuloinnin koordinaatit.');return;} const dLat=100/110540; const dLon=100/(111320*Math.cos(lat*Math.PI/180)); if(dir==='N') mdSimSet(lat+dLat,lon,0); if(dir==='S') mdSimSet(lat-dLat,lon,180); if(dir==='E') mdSimSet(lat,lon+dLon,90); if(dir==='W') mdSimSet(lat,lon-dLon,270); }
+const simStart=document.getElementById('mdSimStartBtn'); if(simStart) simStart.addEventListener('click',()=>{ const lat=parseFloat(String(document.getElementById('mdSimLatInput').value).replace(',','.')); const lon=parseFloat(String(document.getElementById('mdSimLonInput').value).replace(',','.')); if(isNaN(lat)||isNaN(lon)){announce('Tarkista koordinaatit.');return;} if(mdState.running && mdState.watchId!=null){ navigator.geolocation.clearWatch(mdState.watchId); mdState.running=false; mdGpsLabel.textContent='Aloita GPS-seuranta'; mdGpsToggle.className='btn btn-green'; mdGpsToggle.setAttribute('aria-pressed','false'); } mdSimSet(lat,lon,null); });
+['North','East','South','West'].forEach((n,i)=>{ const b=document.getElementById('mdSim'+n+'Btn'); if(b) b.addEventListener('click',()=>mdMoveSim(['N','E','S','W'][i])); });
+const simStop=document.getElementById('mdSimStopBtn'); if(simStop) simStop.addEventListener('click',()=>{ mdState.simulationMode=false; mdSetBanner('Simulointi lopetettu. Aloita GPS-seuranta palataksesi omaan sijaintiin.', 'idle'); });
+
+const gpxImportBtn=document.getElementById('mdGpxImportBtn'); if(gpxImportBtn) gpxImportBtn.addEventListener('click',()=>document.getElementById('mdGpxImportFile').click());
+const gpxFile=document.getElementById('mdGpxImportFile'); if(gpxFile) gpxFile.addEventListener('change',e=>mdImportGpxFile(e.target.files[0]));
+const gpxExport=document.getElementById('mdGpxExportBtn'); if(gpxExport) gpxExport.addEventListener('click',mdExportGpxRoutes);
+const gpxRecord=document.getElementById('mdGpxRecordBtn'); if(gpxRecord) gpxRecord.addEventListener('click',mdStartStopGpxRecording);
+const gpxBtn=document.getElementById('mdGpxBtn'); if(gpxBtn) gpxBtn.addEventListener('click',()=>{mdRenderGpxList(); mdOpenFullView(document.getElementById('mdGpxPanel'));});
+const parkingBtn=document.getElementById('mdShowParkingBtn'); if(parkingBtn) parkingBtn.addEventListener('click',()=>mdShowNearestGroup('parking'));
+
+// Muutetaan nykyiset paneelipainikkeet koko näytön sivuiksi myös vanhojen kuuntelijoiden jälkeen.
+setTimeout(()=>{
+  if(mdOpenLoadBtn) mdOpenLoadBtn.onclick=()=>mdOpenFullView(mdLoadPanel);
+  if(mdOwnPlacesBtn) mdOwnPlacesBtn.onclick=()=>{mdRenderOwnPlaces(); mdOpenFullView(mdOwnPlacesPanel);};
+},0);
 
 mdRouteDirCb.addEventListener('change', () => {
   mdRouteDirStat.style.display = mdRouteDirCb.checked ? '' : 'none';
@@ -2680,7 +2753,7 @@ mdShowLandtypesBtn.addEventListener('click', () => mdShowNearestGroup('landtypes
 mdShowBarriersBtn.addEventListener('click', () => mdShowNearestGroup('barriers'));
 mdShowElevationsBtn.addEventListener('click', () => mdShowNearestGroup('elevations'));
 mdNearestMoreBtn.addEventListener('click', () => {
-  mdState.nearestGroupLimit = (mdState.nearestGroupLimit || 10) + 10;
+  mdState.nearestGroupLimit = (mdState.nearestGroupLimit || 20) + 20;
   mdRenderNearestGroup();
 });
 
@@ -2688,6 +2761,7 @@ mdNearestMoreBtn.addEventListener('click', () => {
 mdGpsToggle.addEventListener('click', async () => {
   warmUpAudioForGps();
   if (!mdState.running) {
+    mdState.simulationMode = false;
     if (!navigator.geolocation) {
       mdSetBanner('Paikannusta ei tueta.', 'error');
       announce('Paikannusta ei tueta.');
@@ -2744,7 +2818,7 @@ mdRenderOwnPlaces();
    BEFOREUNLOAD
    ===================================================== */
 window.addEventListener('beforeunload',e=>{
-  if((recTrackPoints.length&&!recStopBtn.disabled)||navState.running||mdState.running)
+  if((recTrackPoints.length&&!recStopBtn.disabled)||navState.running||mdState.running||mdState.gpxRecording)
     {e.preventDefault();e.returnValue='';}
 });
 
