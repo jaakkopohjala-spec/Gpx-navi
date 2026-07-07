@@ -3296,6 +3296,358 @@ mdGpsToggle.addEventListener('click', async () => {
   };
 })();
 
+
+/* === Korjaukset: tyhjennys, listat ilman ilmoitusvalintasuodatusta, kohteiden seuranta === */
+(function(){
+  mdState.followTargets = mdState.followTargets || [];
+  mdState.lastFollowSpeakTime = mdState.lastFollowSpeakTime || 0;
+  mdState.openActionKey = null;
+
+  function mdAllListKeys(){
+    return ['ownPlaces','gpx','roads','waters','outdoor','parking','structures','landtypes','barriers','elevations','routeRelations'];
+  }
+  function mdListForGroup(key){
+    if (key === 'ownPlaces') return mdState.ownPlaces || [];
+    if (key === 'gpx') return mdState.gpxRoutes || [];
+    if (key === 'roads') return mdState.roads || [];
+    if (key === 'waters') return mdState.waters || [];
+    if (key === 'outdoor') return mdState.outdoor || [];
+    if (key === 'parking') return mdState.parking || [];
+    if (key === 'structures') return mdState.structures || [];
+    if (key === 'landtypes') return mdState.landtypes || [];
+    if (key === 'barriers') return mdState.barriers || [];
+    if (key === 'elevations') return mdState.elevations || [];
+    if (key === 'routeRelations') return mdState.routeRelations || [];
+    return [];
+  }
+  function mdSetListForGroup(key, list){
+    if (key === 'ownPlaces') mdState.ownPlaces = list;
+    else if (key === 'gpx') mdState.gpxRoutes = list;
+    else if (key === 'roads') mdState.roads = list;
+    else if (key === 'waters') mdState.waters = list;
+    else if (key === 'outdoor') mdState.outdoor = list;
+    else if (key === 'parking') mdState.parking = list;
+    else if (key === 'structures') mdState.structures = list;
+    else if (key === 'landtypes') mdState.landtypes = list;
+    else if (key === 'barriers') mdState.barriers = list;
+    else if (key === 'elevations') mdState.elevations = list;
+    else if (key === 'routeRelations') mdState.routeRelations = list;
+  }
+  function mdTitleForGroup(key){
+    const titles = { ownPlaces:'Omat paikat', gpx:'GPX', roads:'Tiet ja polut', waters:'Vesistöt', outdoor:'Retkeilykohteet', parking:'Pysäköinti', structures:'Rakennukset ja rakenteet', landtypes:'Maastotyypit', barriers:'Esteet ja rajoitukset', elevations:'Korkeustagit', routeRelations:'Reittirelaatiot' };
+    return titles[key] || key;
+  }
+  function mdDisplayNameForTarget(key, feature){
+    if (!feature) return 'Kohde';
+    if (key === 'ownPlaces' || key === 'gpx') return feature.name || mdTitleForGroup(key);
+    return mdFeatureName(feature);
+  }
+  function mdTargetKey(key, feature){
+    const id = feature && feature.id != null ? feature.id : (feature && feature.name ? feature.name : mdDisplayNameForTarget(key, feature));
+    return key + ':' + String(id);
+  }
+  function mdIsFollowed(key, feature){
+    const tkey = mdTargetKey(key, feature);
+    return (mdState.followTargets || []).some(t => t.key === tkey);
+  }
+  function mdRemoveFollowTargetByKey(tkey){
+    mdState.followTargets = (mdState.followTargets || []).filter(t => t.key !== tkey);
+  }
+  function mdStopAllFollowTargets(){
+    mdState.followTargets = [];
+    mdState.lastFollowSpeakTime = 0;
+    announce('Kohteiden seuraaminen lopetettu.');
+    if (mdNearestPanel && mdNearestPanel.style.display !== 'none') mdRenderNearestGroup();
+    if (mdOwnPlacesPanel && mdOwnPlacesPanel.style.display !== 'none') mdRenderOwnPlaces();
+    const gpxPanel = document.getElementById('mdGpxPanel');
+    if (gpxPanel && gpxPanel.style.display !== 'none') mdRenderGpxList();
+  }
+  function mdToggleFollowTarget(key, feature){
+    const tkey = mdTargetKey(key, feature);
+    if (mdIsFollowed(key, feature)) {
+      mdRemoveFollowTargetByKey(tkey);
+      announce('Seuranta lopetettu.');
+      return;
+    }
+    if ((mdState.followTargets || []).length >= 2) {
+      announce('Seurannassa voi olla enintään kaksi kohdetta.');
+      return;
+    }
+    mdState.followTargets.push({ key:tkey, group:key, id: feature && feature.id != null ? feature.id : null, name: mdDisplayNameForTarget(key, feature) });
+    mdState.lastFollowSpeakTime = 0;
+    announce(mdDisplayNameForTarget(key, feature) + ' seurannassa.');
+  }
+  function mdFindFollowFeature(target){
+    const list = mdListForGroup(target.group);
+    for (const f of list) {
+      if (mdTargetKey(target.group, f) === target.key) return f;
+    }
+    return null;
+  }
+  function mdNearestTargetInfo(feature, lat, lon){
+    if (!feature || lat == null || lon == null) return null;
+    if (Array.isArray(feature.coords) && feature.coords.length) return mdNearestFeature([feature], lat, lon);
+    if (feature.lat != null && feature.lon != null) {
+      const d = haversine(lat, lon, Number(feature.lat), Number(feature.lon));
+      return { feature, distance:d, closestLat:Number(feature.lat), closestLon:Number(feature.lon) };
+    }
+    return null;
+  }
+  function mdFollowTargetAnnouncements(lat, lon){
+    const active = [];
+    mdState.followTargets = (mdState.followTargets || []).filter(t => !!mdFindFollowFeature(t));
+    for (const t of mdState.followTargets || []) {
+      const f = mdFindFollowFeature(t);
+      const n = mdNearestTargetInfo(f, lat, lon);
+      if (!n) continue;
+      const name = mdDisplayNameForTarget(t.group, f);
+      const distText = n.distance >= 1000 ? (n.distance/1000).toFixed(1) + ' km' : Math.round(n.distance) + ' m';
+      const dir = mdDirectionFromTo(lat, lon, n.closestLat, n.closestLon);
+      active.push(name + ' ' + distText + ' ' + dir);
+    }
+    if (!active.length) return;
+    const now = Date.now();
+    if (now - (mdState.lastFollowSpeakTime || 0) < MD_ANNOUNCE_INTERVAL_MS) return;
+    mdSpeak(active.join(', ') + '.');
+    mdState.lastFollowSpeakTime = now;
+  }
+
+  function mdBuildActionMenu(key, feature, rerender){
+    const menu = document.createElement('div');
+    menu.className = 'save-form';
+    menu.style.marginTop = '.45rem';
+    menu.setAttribute('role','group');
+    menu.setAttribute('aria-label','Kohteen toiminnot');
+    const follow = document.createElement('button');
+    follow.className = 'btn btn-green';
+    follow.textContent = mdIsFollowed(key, feature) ? 'Lopeta seuraaminen' : 'Seuraa';
+    follow.addEventListener('click', e => { e.stopPropagation(); mdToggleFollowTarget(key, feature); if (rerender) rerender(); });
+    const edit = document.createElement('button');
+    edit.className = 'btn btn-yellow';
+    edit.textContent = 'Muokkaa';
+    edit.addEventListener('click', e => {
+      e.stopPropagation();
+      if (key === 'ownPlaces') {
+        mdOpenOwnPlaceForm(feature.id);
+      } else {
+        const oldName = feature.name || mdDisplayNameForTarget(key, feature);
+        const name = prompt('Nimi', oldName);
+        if (name != null) {
+          feature.name = name.trim() || oldName;
+          mdSaveStoredData();
+          if (rerender) rerender();
+        }
+      }
+    });
+    const del = document.createElement('button');
+    del.className = 'btn btn-red';
+    del.textContent = 'Poista';
+    del.addEventListener('click', e => {
+      e.stopPropagation();
+      const tkey = mdTargetKey(key, feature);
+      mdRemoveFollowTargetByKey(tkey);
+      const list = mdListForGroup(key).filter(f => mdTargetKey(key, f) !== tkey);
+      mdSetListForGroup(key, list);
+      if (key === 'ownPlaces') mdState.nextOwnPlaceId = (mdState.ownPlaces || []).reduce((m,p)=>Math.max(m, Number(p.id)||0), 0) + 1;
+      if (key === 'gpx') mdState.nextGpxId = (mdState.gpxRoutes || []).reduce((m,p)=>Math.max(m, Number(p.id)||0), 0) + 1;
+      mdSaveStoredData(); mdUpdateCounts();
+      if (rerender) rerender();
+      announce('Kohde poistettu.');
+    });
+    menu.appendChild(follow); menu.appendChild(edit); menu.appendChild(del);
+    return menu;
+  }
+  function mdAttachActionMenu(row, key, feature, rerender){
+    const tkey = mdTargetKey(key, feature);
+    row.dataset.targetKey = tkey;
+    row.addEventListener('click', e => {
+      if (e.target && e.target.closest && e.target.closest('button')) return;
+      const old = row.querySelector('.target-action-menu');
+      if (old) { old.remove(); mdState.openActionKey = null; return; }
+      const container = row.parentElement;
+      if (container) container.querySelectorAll('.target-action-menu').forEach(x => x.remove());
+      const menu = mdBuildActionMenu(key, feature, rerender);
+      menu.classList.add('target-action-menu');
+      row.appendChild(menu);
+      mdState.openActionKey = tkey;
+    });
+    row.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); row.click(); }
+    });
+  }
+
+  // Listat eivät enää riipu Ilmoitukset-sivun valintaruuduista.
+  mdRenderNearestGroup = function() {
+    const cfg = mdGroupConfig(mdState.nearestGroupKey);
+    if (!cfg) return;
+    mdNearestPanel.style.display = '';
+    mdNearestTitle.textContent = cfg.title;
+    [...mdNearestList.querySelectorAll('.nearest-item')].forEach(el => el.remove());
+    const lat = mdState.currentLat;
+    const lon = mdState.currentLon;
+    mdNearestMoreBtn.style.display = 'none';
+    if (lat == null || lon == null) { mdNearestEmpty.textContent = 'Aloita GPS-seuranta tai simulointi ensin.'; mdNearestEmpty.style.display = ''; return; }
+    const all = mdTopNearestFeatures(cfg.list || [], lat, lon, Infinity);
+    const list = all.slice(0, mdState.nearestGroupLimit || 20);
+    if (!list.length) { mdNearestEmpty.textContent = 'Ei kohteita.'; mdNearestEmpty.style.display = ''; return; }
+    mdNearestEmpty.style.display = 'none';
+    for (const item of list) {
+      const featureName = mdFeatureName(item.feature);
+      const distText = item.distance >= 1000 ? (item.distance/1000).toFixed(1) + ' km' : Math.round(item.distance) + ' m';
+      const dir = mdDirectionFromTo(lat, lon, item.closestLat, item.closestLon);
+      const row = document.createElement('div');
+      row.className = 'nearest-item'; row.setAttribute('role','listitem'); row.setAttribute('tabindex','0');
+      row.setAttribute('aria-label', featureName + ', ' + distText + ' ' + dir + '. Avaa toiminnot kaksoisnapauttamalla.');
+      const nameEl = document.createElement('div'); nameEl.className = 'nearest-item-name'; nameEl.textContent = featureName; nameEl.setAttribute('aria-hidden','true');
+      const distEl = document.createElement('div'); distEl.className = 'nearest-item-dist'; distEl.textContent = distText + ' ' + dir; distEl.setAttribute('aria-hidden','true');
+      row.appendChild(nameEl); row.appendChild(distEl);
+      mdAttachActionMenu(row, mdState.nearestGroupKey, item.feature, mdRenderNearestGroup);
+      mdNearestList.appendChild(row);
+    }
+    if (all.length > list.length) { mdNearestMoreBtn.style.display = ''; mdNearestMoreBtn.textContent = 'Näytä lisää'; }
+  };
+
+  mdRenderOwnPlaces = function() {
+    if (!mdOwnPlacesList) return;
+    [...mdOwnPlacesList.querySelectorAll('.place-item')].forEach(el => el.remove());
+    const lat = mdState.currentLat; const lon = mdState.currentLon;
+    const list = (mdState.ownPlaces || []).map(p => ({...p, d:(lat!=null&&lon!=null)?haversine(lat,lon,p.lat,p.lon):null})).sort((a,b)=>{
+      if(a.d==null&&b.d==null) return 0; if(a.d==null) return 1; if(b.d==null) return -1; return a.d-b.d;
+    });
+    mdOwnPlacesEmpty.style.display = list.length ? 'none' : '';
+    for (const p of list) {
+      const item = document.createElement('div'); item.className = 'place-item'; item.setAttribute('role','listitem'); item.tabIndex = 0;
+      const nameEl = document.createElement('div'); nameEl.className='place-item-name'; nameEl.textContent=p.name; nameEl.setAttribute('aria-hidden','true');
+      const distEl = document.createElement('div'); distEl.className='place-item-dist';
+      let label;
+      if (p.d != null) { const txt = mdPlaceFormatDist(p.d) + ' ' + mdDirectionFromTo(lat, lon, p.lat, p.lon); distEl.textContent = txt; label = p.name + ', ' + txt; }
+      else { const txt = Number(p.lat).toFixed(6) + ', ' + Number(p.lon).toFixed(6); distEl.textContent = txt; label = p.name + ', ' + txt; }
+      distEl.setAttribute('aria-hidden','true'); item.setAttribute('aria-label', label + '. Avaa toiminnot kaksoisnapauttamalla.');
+      item.appendChild(nameEl); item.appendChild(distEl);
+      mdAttachActionMenu(item, 'ownPlaces', p, mdRenderOwnPlaces);
+      mdOwnPlacesList.appendChild(item);
+    }
+  };
+
+  mdRenderGpxList = function() {
+    const list = document.getElementById('mdGpxList'), empty = document.getElementById('mdGpxEmpty');
+    if (!list) return;
+    [...list.querySelectorAll('.place-item')].forEach(el => el.remove());
+    if (empty) empty.style.display = (mdState.gpxRoutes || []).length ? 'none' : '';
+    const lat = mdState.currentLat, lon = mdState.currentLon;
+    for (const r of (mdState.gpxRoutes || [])) {
+      const item = document.createElement('div'); item.className = 'place-item'; item.setAttribute('role','listitem'); item.tabIndex = 0;
+      const n = document.createElement('div'); n.className = 'place-item-name'; n.textContent = r.name; n.setAttribute('aria-hidden','true');
+      const d = document.createElement('div'); d.className = 'place-item-dist'; d.setAttribute('aria-hidden','true');
+      let label = r.name + ', ' + ((r.coords || []).length) + ' pistettä';
+      if (lat != null && lon != null) {
+        const nearest = mdNearestFeature([r], lat, lon);
+        if (nearest) { const dir = mdDirectionFromTo(lat, lon, nearest.closestLat, nearest.closestLon); const distText = nearest.distance >= 1000 ? (nearest.distance/1000).toFixed(1) + ' km' : Math.round(nearest.distance) + ' m'; d.textContent = distText + ' ' + dir; label = r.name + ', ' + distText + ' ' + dir; }
+        else d.textContent = (r.coords || []).length + ' pistettä';
+      } else d.textContent = (r.coords || []).length + ' pistettä';
+      item.setAttribute('aria-label', label + '. Avaa toiminnot kaksoisnapauttamalla.');
+      item.appendChild(n); item.appendChild(d);
+      mdAttachActionMenu(item, 'gpx', r, mdRenderGpxList);
+      list.appendChild(item);
+    }
+  };
+
+  // Ilmoitusvalinnat vaikuttavat automaattiseen puheeseen, eivät alisivujen listaukseen tai näyttöteksteihin.
+  mdHandleRoads = function(lat, lon) {
+    const nearest = mdNearestFeature(mdState.roads || [], lat, lon);
+    if (!nearest) { mdSetRoadBox('Ei ladattuja teitä tai polkuja tällä alueella.', 'error'); mdRoadDist.textContent='–'; return; }
+    const featureName = mdFeatureName(nearest.feature);
+    const distText = Math.round(nearest.distance) + ' m';
+    const dir = mdDirectionFromTo(lat, lon, nearest.closestLat, nearest.closestLon);
+    const onRoad = nearest.distance <= MD_ROUTE_THRESHOLD_M;
+    mdRoadDist.textContent = distText; mdRoadDist.className = 'stat-value ' + (onRoad ? 'green' : 'yellow');
+    mdSetRoadBox(onRoad ? 'Olet tiellä tai polulla: ' + featureName + '. Poikkeama ' + distText + '.' : 'Lähin tie tai polku: ' + featureName + ', ' + distText + ' ' + dir + '.', onRoad ? 'on-route' : 'off-route');
+    let routeAxisForSpeech = '';
+    if (mdRouteDirCb.checked && nearest.segmentBearing != null) { const axis = axisToText(nearest.segmentBearing); mdRouteDirEl.textContent = axis; routeAxisForSpeech = axis || ''; }
+    let userDirForSpeech = mdUserDirCb.checked ? mdCurrentMovementDirectionText() : '';
+    const cb = document.getElementById('mdRoadsCb');
+    if (!cb || cb.checked) mdMaybeRoadAudio(onRoad, distText, dir, routeAxisForSpeech, userDirForSpeech);
+    mdState.lastNearestRoad = nearest;
+    if (onRoad) mdMaybeCrossingAnnouncement(lat, lon, nearest);
+  };
+
+  mdHandleWaters = function(lat, lon) {
+    const nearest = mdNearestFeature(mdState.waters || [], lat, lon);
+    if (!nearest) { mdSetWaterBox('Ei ladattuja vesistöjä tällä alueella.', ''); mdWaterDist.textContent='–'; return; }
+    const featureName = mdFeatureName(nearest.feature);
+    const distText = nearest.distance >= 1000 ? (nearest.distance/1000).toFixed(1) + ' km' : Math.round(nearest.distance) + ' m';
+    const dir = mdDirectionFromTo(lat, lon, nearest.closestLat, nearest.closestLon);
+    mdWaterDist.textContent = distText;
+    mdSetWaterBox('Lähin vesistö: ' + featureName + ', ' + distText + ' ' + dir + '.', '');
+  };
+
+  mdHandleGpx = function(lat, lon) {
+    const distEl = document.getElementById('mdGpxDist'); const statusEl = document.getElementById('mdGpxStatus');
+    const nearest = mdNearestFeature(mdState.gpxRoutes || [], lat, lon);
+    if (!nearest) { if(distEl) distEl.textContent='–'; if(statusEl) statusEl.textContent='Ei GPX-reittiä.'; return; }
+    const distText = Math.round(nearest.distance) + ' m'; const dir = mdDirectionFromTo(lat, lon, nearest.closestLat, nearest.closestLon);
+    const onRoute = nearest.distance <= MD_ROUTE_THRESHOLD_M;
+    if(distEl) distEl.textContent = distText;
+    if(statusEl) statusEl.textContent = onRoute ? 'Olet GPX-reitillä: ' + mdFeatureName(nearest.feature) + '. Poikkeama ' + distText + '.' : 'GPX-reitti: ' + mdFeatureName(nearest.feature) + ', ' + distText + ' ' + dir + '.';
+    let routeAxisForSpeech = mdRouteDirCb.checked && nearest.segmentBearing != null ? (axisToText(nearest.segmentBearing) || '') : '';
+    let userDirForSpeech = mdUserDirCb.checked ? mdCurrentMovementDirectionText() : '';
+    const cb = document.getElementById('mdGpxCb');
+    if (!cb || cb.checked) mdMaybeGpxAudio(onRoute, distText, dir, routeAxisForSpeech, userDirForSpeech);
+  };
+
+  mdMaybeOwnPlaceAnnouncements = function(lat, lon) {
+    const cb = document.getElementById('mdOwnPlacesCb');
+    if (cb && !cb.checked) return;
+    const activeNow = {};
+    for (const p of mdState.ownPlaces || []) {
+      const d = haversine(lat, lon, p.lat, p.lon);
+      if (d <= 15) { activeNow[p.id] = true; if (!mdState.ownPlaceInside[p.id]) { const dir = mdDirectionFromTo(lat, lon, p.lat, p.lon); mdSpeak(p.name + ' 15 metriä ' + dir); mdState.ownPlaceInside[p.id] = true; } }
+    }
+    for (const key of Object.keys(mdState.ownPlaceInside)) if (!activeNow[key]) delete mdState.ownPlaceInside[key];
+  };
+
+  // Seuratut kohteet puhutaan 20 sekunnin välein normaalien ilmoitusten rinnalla.
+  const mdHandlePositionBeforeFollow = mdHandlePosition;
+  mdHandlePosition = function(pos) {
+    mdHandlePositionBeforeFollow(pos);
+    if (mdState.currentLat != null && mdState.currentLon != null) mdFollowTargetAnnouncements(mdState.currentLat, mdState.currentLon);
+  };
+  const mdSimSetBeforeFollow = typeof mdSimSet === 'function' ? mdSimSet : null;
+  if (mdSimSetBeforeFollow) {
+    mdSimSet = function(lat, lon, heading) { mdSimSetBeforeFollow(lat, lon, heading); mdFollowTargetAnnouncements(lat, lon); };
+  }
+
+  // Täysi tyhjennys, myös reittirelaatiot ja seuratut kohteet.
+  mdClearData = function() {
+    for (const key of mdAllListKeys()) mdSetListForGroup(key, []);
+    mdState.nextOwnPlaceId = 1; mdState.nextGpxId = 1;
+    mdState.loadedAt = null; mdState.center = null; mdState.centers = [];
+    mdState.lastNearestRoad = null; mdState.crossingInside = {}; mdState.lastCrossingRoadName = '';
+    mdState.ownPlaceInside = {}; mdState.categoryInside = {}; mdState.followTargets = []; mdState.lastFollowSpeakTime = 0;
+    mdState.lastRouteRelationSpeakTime = 0;
+    try { localStorage.removeItem(MD_STORAGE_KEY); } catch(e) {}
+    mdUpdateCounts(); mdRenderOwnPlaces(); mdRenderGpxList();
+    mdRoadDist.textContent='–'; mdWaterDist.textContent='–'; const gd=document.getElementById('mdGpxDist'); if(gd) gd.textContent='–';
+    mdSetRoadBox('Data tyhjennetty.',''); mdSetWaterBox('Data tyhjennetty.',''); const gs=document.getElementById('mdGpxStatus'); if(gs) gs.textContent='Data tyhjennetty.';
+    if(mdOwnPlaceStatus) mdOwnPlaceStatus.textContent='Ei omia paikkoja tallennettuna.'; if(mdOwnPlaceDist) mdOwnPlaceDist.textContent='–';
+    mdSetBanner('Data tyhjennetty.','idle'); announce('Data tyhjennetty.');
+  };
+  if (mdClearBtn) {
+    mdClearBtn.addEventListener('click', e => { e.preventDefault(); e.stopImmediatePropagation(); mdClearData(); }, true);
+  }
+
+  // Ilmoitukset-sivulle kohteiden seurannan nollaus.
+  const notif = document.getElementById('mdNotificationsPanel');
+  if (notif && !document.getElementById('mdStopFollowTargetsBtn')) {
+    const inner = notif.querySelector('.view-inner') || notif;
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-red'; btn.id = 'mdStopFollowTargetsBtn'; btn.textContent = 'Lopeta kohteiden seuraaminen';
+    btn.addEventListener('click', mdStopAllFollowTargets);
+    const firstGroup = inner.querySelector('.check-group');
+    if (firstGroup) inner.insertBefore(btn, firstGroup.nextSibling); else inner.appendChild(btn);
+  }
+})();
+
 mdLoadStoredData();
 mdUpdateCounts();
 mdRenderOwnPlaces();
