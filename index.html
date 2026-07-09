@@ -3666,6 +3666,426 @@ if('serviceWorker' in navigator){
       .catch(err=>console.warn('SW epäonnistui:',err));
   });
 }
+/* === Korjaus: reittirelaatioiden vienti/tuonti, reittirelaation suunta ja paikallinen navigointi === */
+(function(){
+  'use strict';
+
+  const STORAGE_VERSION = 5;
+  mdState.routeRelations = Array.isArray(mdState.routeRelations) ? mdState.routeRelations : [];
+  mdState.navigationRoute = mdState.navigationRoute || null;
+  mdState.lastNavigationState = null;
+  mdState.lastNavOnSoundTime = 0;
+  mdState.lastNavOffSoundTime = 0;
+
+  function mdAllDataKeysCanonical() {
+    return ['roads','waters','outdoor','parking','structures','landtypes','barriers','elevations','routeRelations','ownPlaces','gpxRoutes'];
+  }
+
+  function mdCanonicalDataObject() {
+    return {
+      version: STORAGE_VERSION,
+      source: 'OpenStreetMap / Overpass',
+      exportedAt: new Date().toISOString(),
+      loadedAt: mdState.loadedAt || null,
+      center: mdState.center || null,
+      centers: Array.isArray(mdState.centers) ? mdState.centers : [],
+      roads: mdState.roads || [],
+      waters: mdState.waters || [],
+      outdoor: mdState.outdoor || [],
+      parking: mdState.parking || [],
+      structures: mdState.structures || [],
+      landtypes: mdState.landtypes || [],
+      barriers: mdState.barriers || [],
+      elevations: mdState.elevations || [],
+      routeRelations: mdState.routeRelations || [],
+      ownPlaces: mdState.ownPlaces || [],
+      gpxRoutes: mdState.gpxRoutes || []
+    };
+  }
+
+  mdSaveStoredData = function() {
+    try {
+      localStorage.setItem(MD_STORAGE_KEY, JSON.stringify(mdCanonicalDataObject()));
+    } catch(e) {
+      announce('Datan tallentaminen selaimeen epäonnistui.');
+    }
+  };
+
+  function mdSetArrayState(key, value) {
+    if (key === 'gpxRoutes') mdState.gpxRoutes = Array.isArray(value) ? value : [];
+    else if (key === 'ownPlaces') mdState.ownPlaces = Array.isArray(value) ? value : [];
+    else mdState[key] = Array.isArray(value) ? value : [];
+  }
+
+  mdLoadStoredData = function() {
+    try {
+      const raw = localStorage.getItem(MD_STORAGE_KEY) || localStorage.getItem('gpxAppMaastodataV1');
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      for (const key of mdAllDataKeysCanonical()) mdSetArrayState(key, data[key]);
+      mdState.nextOwnPlaceId = (mdState.ownPlaces || []).reduce((m,p)=>Math.max(m, Number(p.id)||0), 0) + 1;
+      mdState.nextGpxId = (mdState.gpxRoutes || []).reduce((m,p)=>Math.max(m, Number(p.id)||0), 0) + 1;
+      mdState.loadedAt = data.loadedAt || null;
+      mdState.center = data.center || null;
+      mdState.centers = Array.isArray(data.centers) ? data.centers : (data.center ? [data.center] : []);
+      mdUpdateCounts();
+      if (typeof mdRenderOwnPlaces === 'function') mdRenderOwnPlaces();
+      if (typeof mdRenderGpxList === 'function') mdRenderGpxList();
+    } catch(e) {
+      console.warn('Datan lataus muistista epäonnistui:', e);
+    }
+  };
+
+  function mdImportListByKey(key, incoming) {
+    const list = Array.isArray(incoming) ? incoming : [];
+    if (!list.length) return 0;
+    const oldList = (key === 'gpxRoutes') ? (mdState.gpxRoutes || []) : (key === 'ownPlaces' ? (mdState.ownPlaces || []) : (mdState[key] || []));
+    const merged = mdMergeFeatureLists(oldList, list);
+    mdSetArrayState(key, merged.list);
+    return merged.added;
+  }
+
+  mdImportDataFromObject = function(data) {
+    if (!data || typeof data !== 'object') throw new Error('Tiedosto ei sisällä kelvollista dataa.');
+    const added = {};
+    for (const key of mdAllDataKeysCanonical()) added[key] = mdImportListByKey(key, data[key]);
+    if (Array.isArray(data.centers)) mdState.centers = (mdState.centers || []).concat(data.centers);
+    if (data.center) mdState.center = data.center;
+    mdState.loadedAt = data.loadedAt || mdState.loadedAt || new Date().toISOString();
+    mdState.nextOwnPlaceId = (mdState.ownPlaces || []).reduce((m,p)=>Math.max(m, Number(p.id)||0), 0) + 1;
+    mdState.nextGpxId = (mdState.gpxRoutes || []).reduce((m,p)=>Math.max(m, Number(p.id)||0), 0) + 1;
+    mdSaveStoredData();
+    mdUpdateCounts();
+    if (typeof mdRenderOwnPlaces === 'function') mdRenderOwnPlaces();
+    if (typeof mdRenderGpxList === 'function') mdRenderGpxList();
+    if (mdNearestPanel && mdNearestPanel.style.display !== 'none' && mdState.nearestGroupKey) mdRenderNearestGroup();
+    announce('Data tuotu.');
+  };
+
+  mdExportData = function() {
+    const blob = new Blob([JSON.stringify(mdCanonicalDataObject(), null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'kartta_ja_paikat_' + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    announce('Data viety.');
+  };
+
+  mdClearData = function() {
+    for (const key of mdAllDataKeysCanonical()) mdSetArrayState(key, []);
+    mdState.nextOwnPlaceId = 1;
+    mdState.nextGpxId = 1;
+    mdState.loadedAt = null;
+    mdState.center = null;
+    mdState.centers = [];
+    mdState.lastNearestRoad = null;
+    mdState.crossingInside = {};
+    mdState.lastCrossingRoadName = '';
+    mdState.ownPlaceInside = {};
+    mdState.categoryInside = {};
+    mdState.followTargets = [];
+    mdState.lastFollowSpeakTime = 0;
+    mdState.lastRouteRelationSpeakTime = 0;
+    mdState.navigationRoute = null;
+    mdState.lastNavigationState = null;
+    try { localStorage.removeItem(MD_STORAGE_KEY); } catch(e) {}
+    mdUpdateCounts();
+    if (typeof mdRenderOwnPlaces === 'function') mdRenderOwnPlaces();
+    if (typeof mdRenderGpxList === 'function') mdRenderGpxList();
+    if (mdNearestPanel && mdNearestPanel.style.display !== 'none' && mdState.nearestGroupKey) mdRenderNearestGroup();
+    if (mdRoadDist) mdRoadDist.textContent = '–';
+    if (mdWaterDist) mdWaterDist.textContent = '–';
+    const gd = document.getElementById('mdGpxDist'); if (gd) gd.textContent = '–';
+    mdSetRoadBox('Data tyhjennetty.', '');
+    mdSetWaterBox('Data tyhjennetty.', '');
+    const gs = document.getElementById('mdGpxStatus'); if (gs) gs.textContent = 'Data tyhjennetty.';
+    if (mdOwnPlaceStatus) mdOwnPlaceStatus.textContent = 'Ei omia paikkoja tallennettuna.';
+    if (mdOwnPlaceDist) mdOwnPlaceDist.textContent = '–';
+    mdSetBanner('Data tyhjennetty.', 'idle');
+    mdUpdateNavigationStatus();
+    announce('Data tyhjennetty.');
+  };
+
+  // Varmistetaan, että painikkeet käyttävät aina viimeisintä funktiota, eivät vanhaa viittausta.
+  if (mdExportBtn) mdExportBtn.addEventListener('click', e => { e.preventDefault(); e.stopImmediatePropagation(); mdExportData(); }, true);
+  if (mdImportBtn) mdImportBtn.addEventListener('click', e => { e.preventDefault(); e.stopImmediatePropagation(); mdImportFile.click(); }, true);
+  if (mdImportFile) mdImportFile.addEventListener('change', e => { e.stopImmediatePropagation(); mdImportDataFile(e.target.files[0]); }, true);
+  if (mdClearBtn) mdClearBtn.addEventListener('click', e => { e.preventDefault(); e.stopImmediatePropagation(); mdClearData(); }, true);
+
+  function mdRouteRelationDisplayNameSafe(feature) {
+    return (feature && feature.name ? String(feature.name).trim() : '') || (feature && feature.typeText ? feature.typeText : 'Reittirelaatio');
+  }
+
+  mdHandleRouteRelations = function(lat, lon) {
+    const cb = document.getElementById('mdRouteRelationsCb');
+    if (cb && !cb.checked) return;
+    const nearest = mdNearestFeature(mdState.routeRelations || [], lat, lon);
+    if (!nearest) return;
+    const now = Date.now();
+    if (now - (mdState.lastRouteRelationSpeakTime || 0) < MD_ANNOUNCE_INTERVAL_MS) return;
+    const name = mdRouteRelationDisplayNameSafe(nearest.feature);
+    const distText = nearest.distance >= 1000 ? (nearest.distance/1000).toFixed(1) + ' km' : Math.round(nearest.distance) + ' m';
+    const dir = mdDirectionFromTo(lat, lon, nearest.closestLat, nearest.closestLon);
+    const parts = [name + ' ' + distText + ' ' + dir];
+    if (mdRouteDirCb && mdRouteDirCb.checked && nearest.segmentBearing != null) {
+      const axis = axisToText(nearest.segmentBearing);
+      if (mdRouteDirEl) mdRouteDirEl.textContent = axis || '–';
+      if (axis) parts.push('reitin suunta ' + axis);
+    }
+    mdSpeak(parts.join(', ') + '.');
+    mdState.lastRouteRelationSpeakTime = now;
+  };
+
+  // Navigointinäkymän lyhyt tilaruutu perusnäyttöön.
+  const homeActions = document.querySelector('#panel-map .home-actions');
+  if (homeActions && !document.getElementById('mdNavigationStatus')) {
+    const box = document.createElement('div');
+    box.className = 'info-box';
+    box.id = 'mdNavigationStatus';
+    box.setAttribute('aria-label', 'Navigointi');
+    box.setAttribute('role', 'status');
+    box.setAttribute('aria-live', 'off');
+    box.textContent = 'Navigointi ei käynnissä.';
+    homeActions.insertAdjacentElement('afterend', box);
+  }
+
+  function mdUpdateNavigationStatus(text) {
+    const el = document.getElementById('mdNavigationStatus');
+    if (!el) return;
+    if (text) el.textContent = text;
+    else if (mdState.navigationRoute) el.textContent = 'Navigointi: ' + (mdState.navigationRoute.name || 'reitti') + '.';
+    else el.textContent = 'Navigointi ei käynnissä.';
+  }
+  window.mdUpdateNavigationStatus = mdUpdateNavigationStatus;
+
+  function mdKeyForCoord(p) {
+    return Number(p.lat).toFixed(6) + ',' + Number(p.lon).toFixed(6);
+  }
+
+  function mdBuildRoadGraph(start, end) {
+    const graph = new Map();
+    const nodes = new Map();
+    const edges = [];
+    function addNode(id, p) { if (!nodes.has(id)) nodes.set(id, { id, lat: p.lat, lon: p.lon }); if (!graph.has(id)) graph.set(id, []); }
+    function addEdge(aId, a, bId, b) {
+      addNode(aId, a); addNode(bId, b);
+      const w = haversine(a.lat, a.lon, b.lat, b.lon);
+      graph.get(aId).push({ to: bId, w });
+      graph.get(bId).push({ to: aId, w });
+      edges.push({ aId, bId, a, b, w });
+    }
+    for (const road of mdState.roads || []) {
+      const coords = road.coords || [];
+      for (let i = 0; i < coords.length - 1; i++) {
+        const a = coords[i], b = coords[i+1];
+        addEdge(mdKeyForCoord(a), a, mdKeyForCoord(b), b);
+      }
+    }
+    function connectVirtual(id, p) {
+      addNode(id, p);
+      let best = null;
+      for (const e of edges) {
+        const c = mdClosestOnSegment(p.lat, p.lon, e.a, e.b);
+        if (!best || c.distance < best.distance) best = { e, c };
+      }
+      if (!best) return false;
+      const snap = { lat: best.c.lat, lon: best.c.lon };
+      const snapId = id + '_snap';
+      addNode(snapId, snap);
+      // Kytketään lähimmän segmentin molempiin päihin sekä virtuaalipisteeseen.
+      addEdge(id, p, snapId, snap);
+      addEdge(snapId, snap, best.e.aId, best.e.a);
+      addEdge(snapId, snap, best.e.bId, best.e.b);
+      return true;
+    }
+    if (!connectVirtual('START', start)) return null;
+    if (!connectVirtual('END', end)) return null;
+    return { graph, nodes, startId: 'START', endId: 'END' };
+  }
+
+  function mdShortestPath(graphObj) {
+    if (!graphObj) return null;
+    const { graph, nodes, startId, endId } = graphObj;
+    const dist = new Map();
+    const prev = new Map();
+    const visited = new Set();
+    for (const id of graph.keys()) dist.set(id, Infinity);
+    dist.set(startId, 0);
+    while (true) {
+      let u = null, best = Infinity;
+      for (const [id, d] of dist.entries()) {
+        if (!visited.has(id) && d < best) { best = d; u = id; }
+      }
+      if (u == null || u === endId) break;
+      visited.add(u);
+      for (const edge of graph.get(u) || []) {
+        const nd = best + edge.w;
+        if (nd < (dist.get(edge.to) || Infinity)) { dist.set(edge.to, nd); prev.set(edge.to, u); }
+      }
+    }
+    if (!isFinite(dist.get(endId))) return null;
+    const ids = [];
+    let cur = endId;
+    while (cur) { ids.push(cur); if (cur === startId) break; cur = prev.get(cur); }
+    if (ids[ids.length - 1] !== startId) return null;
+    ids.reverse();
+    const coords = [];
+    for (const id of ids) {
+      const n = nodes.get(id);
+      if (!n) continue;
+      if (!coords.length || haversine(coords[coords.length-1].lat, coords[coords.length-1].lon, n.lat, n.lon) > 0.5) coords.push({ lat: n.lat, lon: n.lon });
+    }
+    return { coords, distance: dist.get(endId) };
+  }
+
+  function mdDestinationPointForFeature(key, feature) {
+    const lat = mdState.currentLat, lon = mdState.currentLon;
+    if (lat == null || lon == null || !feature) return null;
+    if (key === 'ownPlaces' && feature.lat != null && feature.lon != null) return { lat: Number(feature.lat), lon: Number(feature.lon) };
+    const nearest = mdNearestFeature([feature], lat, lon);
+    if (nearest) return { lat: nearest.closestLat, lon: nearest.closestLon };
+    const coords = feature.coords || [];
+    return coords.length ? coords[0] : null;
+  }
+
+  function mdNavigationName(key, feature) {
+    const name = mdDisplayNameForTarget ? mdDisplayNameForTarget(key, feature) : mdFeatureName(feature);
+    return name || 'kohde';
+  }
+
+  function mdStartNavigationTo(key, feature) {
+    const lat = mdState.currentLat, lon = mdState.currentLon;
+    if (lat == null || lon == null) { announce('Aloita GPS-seuranta tai simulointi ensin.'); return; }
+    if (!Array.isArray(mdState.roads) || mdState.roads.length === 0) { announce('Lataa ensin tiet ja polut karttadataan.'); return; }
+    const dest = mdDestinationPointForFeature(key, feature);
+    if (!dest) { announce('Kohteen sijaintia ei voitu määrittää.'); return; }
+    const start = { lat, lon };
+    const graph = mdBuildRoadGraph(start, dest);
+    const path = mdShortestPath(graph);
+    if (!path || !path.coords || path.coords.length < 2) {
+      announce('Reittiä ei löytynyt ladatusta karttadatasta.');
+      mdSetBanner('Reittiä ei löytynyt ladatusta karttadatasta.', 'error');
+      return;
+    }
+    const routeName = 'Reitti: ' + mdNavigationName(key, feature);
+    mdState.navigationRoute = {
+      id: 'navigation:' + Date.now(),
+      name: routeName,
+      kind: 'navigation',
+      typeText: 'navigointireitti',
+      coords: path.coords,
+      distance: path.distance
+    };
+    mdState.lastNavigationState = null;
+    mdState.lastNavOnSoundTime = 0;
+    mdState.lastNavOffSoundTime = 0;
+    mdUpdateNavigationStatus('Navigointi käynnissä: ' + mdNavigationName(key, feature) + ', reitti ' + formatDist(path.distance) + '.');
+    mdSetBanner('Navigointi käynnissä.', 'running');
+    announce('Navigointi käynnistetty. Reitti ' + formatDist(path.distance) + '.');
+  }
+
+  function mdStopNavigation() {
+    mdState.navigationRoute = null;
+    mdState.lastNavigationState = null;
+    mdUpdateNavigationStatus('Navigointi lopetettu.');
+    announce('Navigointi lopetettu.');
+  }
+  window.mdStopNavigation = mdStopNavigation;
+
+  function mdHandleNavigation(lat, lon) {
+    const route = mdState.navigationRoute;
+    if (!route || !Array.isArray(route.coords) || route.coords.length < 2) { mdUpdateNavigationStatus(); return; }
+    const nearest = mdNearestFeature([route], lat, lon);
+    if (!nearest) return;
+    const distText = Math.round(nearest.distance) + ' m';
+    const dir = mdDirectionFromTo(lat, lon, nearest.closestLat, nearest.closestLon);
+    const onRoute = nearest.distance <= MD_ROUTE_THRESHOLD_M;
+    let routeAxisForSpeech = '';
+    if (mdRouteDirCb && mdRouteDirCb.checked && nearest.segmentBearing != null) {
+      const axis = axisToText(nearest.segmentBearing);
+      if (mdRouteDirEl) mdRouteDirEl.textContent = axis || '–';
+      routeAxisForSpeech = axis || '';
+    }
+    const userDirForSpeech = mdUserDirCb && mdUserDirCb.checked ? mdCurrentMovementDirectionText() : '';
+    const now = Date.now();
+    const changed = mdState.lastNavigationState !== onRoute;
+    if (onRoute) {
+      mdUpdateNavigationStatus('Navigointi: reitillä. Poikkeama ' + distText + '.');
+      if (changed || now - (mdState.lastNavOnSoundTime || 0) >= MD_ANNOUNCE_INTERVAL_MS) {
+        playKnock();
+        mdState.lastNavOnSoundTime = now;
+        const parts = [];
+        if (routeAxisForSpeech) parts.push('Reitin suunta ' + routeAxisForSpeech);
+        if (userDirForSpeech) parts.push('kuljet ' + userDirForSpeech);
+        if (parts.length) mdSpeak(parts.join(', ') + '.', 350);
+      }
+    } else {
+      mdUpdateNavigationStatus('Navigointi: poissa reitiltä. ' + distText + ' ' + dir + '.');
+      if (changed || now - (mdState.lastNavOffSoundTime || 0) >= MD_ANNOUNCE_INTERVAL_MS) {
+        playOffRouteChime();
+        const parts = [distText + ' ' + dir];
+        if (routeAxisForSpeech) parts.push('reitin suunta ' + routeAxisForSpeech);
+        if (userDirForSpeech) parts.push('kuljet ' + userDirForSpeech);
+        mdSpeak(parts.join(', ') + '.', 450);
+        mdState.lastNavOffSoundTime = now;
+      }
+    }
+    mdState.lastNavigationState = onRoute;
+  }
+
+  // Lisätään Anna reitti -painike kohdevalikkoihin.
+  const mdBuildActionMenuPreviousNavigation = mdBuildActionMenu;
+  mdBuildActionMenu = function(key, feature, rerender) {
+    const menu = mdBuildActionMenuPreviousNavigation(key, feature, rerender);
+    if (!menu || menu.querySelector('.md-nav-target-btn')) return menu;
+    const navBtn = document.createElement('button');
+    navBtn.className = 'btn btn-blue md-nav-target-btn';
+    navBtn.textContent = 'Anna reitti';
+    navBtn.addEventListener('click', e => { e.stopPropagation(); mdStartNavigationTo(key, feature); });
+    menu.insertBefore(navBtn, menu.firstChild);
+    return menu;
+  };
+
+  // Ilmoitukset-sivulle navigoinnin lopetus.
+  const notif = document.getElementById('mdNotificationsPanel');
+  if (notif && !document.getElementById('mdStopNavigationBtn')) {
+    const inner = notif.querySelector('.view-inner') || notif;
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-red';
+    btn.id = 'mdStopNavigationBtn';
+    btn.textContent = 'Lopeta navigointi';
+    btn.addEventListener('click', mdStopNavigation);
+    const stopFollow = document.getElementById('mdStopFollowTargetsBtn');
+    if (stopFollow) stopFollow.insertAdjacentElement('afterend', btn);
+    else {
+      const firstGroup = inner.querySelector('.check-group');
+      if (firstGroup) inner.insertBefore(btn, firstGroup.nextSibling); else inner.appendChild(btn);
+    }
+  }
+
+  // Ajetaan navigointi sekä GPS- että simulaatiopäivityksissä viimeisenä.
+  const mdHandlePositionBeforeNavigation = mdHandlePosition;
+  mdHandlePosition = function(pos) {
+    mdHandlePositionBeforeNavigation(pos);
+    if (mdState.currentLat != null && mdState.currentLon != null) mdHandleNavigation(mdState.currentLat, mdState.currentLon);
+  };
+  const mdSimSetBeforeNavigation = typeof mdSimSet === 'function' ? mdSimSet : null;
+  if (mdSimSetBeforeNavigation) {
+    mdSimSet = function(lat, lon, heading) {
+      mdSimSetBeforeNavigation(lat, lon, heading);
+      mdHandleNavigation(lat, lon);
+    };
+  }
+
+  // Päivitetään laskurit ja tilat nyt, jotta vanha localStorage näkyy oikein myös reittirelaatioissa.
+  mdUpdateCounts();
+  mdUpdateNavigationStatus();
+})();
+
 </script>
 </body>
 </html>
