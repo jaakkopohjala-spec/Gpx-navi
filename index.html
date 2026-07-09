@@ -3418,6 +3418,14 @@ mdGpsToggle.addEventListener('click', async () => {
     menu.style.marginTop = '.45rem';
     menu.setAttribute('role','group');
     menu.setAttribute('aria-label','Kohteen toiminnot');
+    const navBtn = document.createElement('button');
+    navBtn.className = 'btn btn-blue md-nav-target-btn';
+    navBtn.textContent = 'Anna reitti';
+    navBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      if (window.mdStartNavigationTo) window.mdStartNavigationTo(key, feature);
+      else announce('Navigointitoimintoa ei voitu käynnistää.');
+    });
     const follow = document.createElement('button');
     follow.className = 'btn btn-green';
     follow.textContent = mdIsFollowed(key, feature) ? 'Lopeta seuraaminen' : 'Seuraa';
@@ -3454,7 +3462,7 @@ mdGpsToggle.addEventListener('click', async () => {
       if (rerender) rerender();
       announce('Kohde poistettu.');
     });
-    menu.appendChild(follow); menu.appendChild(edit); menu.appendChild(del);
+    menu.appendChild(navBtn); menu.appendChild(follow); menu.appendChild(edit); menu.appendChild(del);
     return menu;
   }
   function mdAttachActionMenu(row, key, feature, rerender){
@@ -3988,6 +3996,8 @@ if('serviceWorker' in navigator){
     announce('Navigointi käynnistetty. Reitti ' + formatDist(path.distance) + '.');
   }
 
+  window.mdStartNavigationTo = mdStartNavigationTo;
+
   function mdStopNavigation() {
     mdState.navigationRoute = null;
     mdState.lastNavigationState = null;
@@ -4037,19 +4047,6 @@ if('serviceWorker' in navigator){
     mdState.lastNavigationState = onRoute;
   }
 
-  // Lisätään Anna reitti -painike kohdevalikkoihin.
-  const mdBuildActionMenuPreviousNavigation = mdBuildActionMenu;
-  mdBuildActionMenu = function(key, feature, rerender) {
-    const menu = mdBuildActionMenuPreviousNavigation(key, feature, rerender);
-    if (!menu || menu.querySelector('.md-nav-target-btn')) return menu;
-    const navBtn = document.createElement('button');
-    navBtn.className = 'btn btn-blue md-nav-target-btn';
-    navBtn.textContent = 'Anna reitti';
-    navBtn.addEventListener('click', e => { e.stopPropagation(); mdStartNavigationTo(key, feature); });
-    menu.insertBefore(navBtn, menu.firstChild);
-    return menu;
-  };
-
   // Ilmoitukset-sivulle navigoinnin lopetus.
   const notif = document.getElementById('mdNotificationsPanel');
   if (notif && !document.getElementById('mdStopNavigationBtn')) {
@@ -4086,6 +4083,96 @@ if('serviceWorker' in navigator){
   mdUpdateNavigationStatus();
 })();
 
+
+
+/* === FINAL FIX: navigointi näkyviin, reittirelaation kulkusuunta ja lopetusnappi === */
+(function(){
+  // Varmistetaan, että navigointifunktiot ovat käytettävissä myös myöhemmissä napinkuuntelijoissa.
+  if (typeof mdStartNavigationTo === 'function') window.mdStartNavigationTo = mdStartNavigationTo;
+  if (typeof mdStopNavigation === 'function') window.mdStopNavigation = mdStopNavigation;
+
+  // Reittirelaation 20 s ilmoitus: lisää reitin kulkusuunta, kun valinta on päällä.
+  if (typeof mdNearestFeature === 'function') {
+    window.mdHandleRouteRelations = mdHandleRouteRelations = function(lat, lon) {
+      const cb = document.getElementById('mdRouteRelationsCb');
+      if (cb && !cb.checked) return;
+      const nearest = mdNearestFeature(mdState.routeRelations || [], lat, lon);
+      if (!nearest) return;
+      const now = Date.now();
+      if (now - (mdState.lastRouteRelationSpeakTime || 0) < MD_ANNOUNCE_INTERVAL_MS) return;
+      const name = (nearest.feature && nearest.feature.name ? String(nearest.feature.name).trim() : '') ||
+                   (nearest.feature && nearest.feature.typeText ? nearest.feature.typeText : 'Reittirelaatio');
+      const distText = nearest.distance >= 1000 ? (nearest.distance/1000).toFixed(1) + ' km' : Math.round(nearest.distance) + ' m';
+      const dir = mdDirectionFromTo(lat, lon, nearest.closestLat, nearest.closestLon);
+      const parts = [name + ' ' + distText + ' ' + dir];
+      if (mdRouteDirCb && mdRouteDirCb.checked && nearest.segmentBearing != null) {
+        const axis = axisToText(nearest.segmentBearing);
+        if (mdRouteDirEl) mdRouteDirEl.textContent = axis || '–';
+        if (axis) parts.push('reitin suunta ' + axis);
+      }
+      if (mdUserDirCb && mdUserDirCb.checked && typeof mdCurrentMovementDirectionText === 'function') {
+        const userDir = mdCurrentMovementDirectionText();
+        if (userDir) parts.push('kuljet ' + userDir);
+      }
+      mdSpeak(parts.join(', ') + '.');
+      mdState.lastRouteRelationSpeakTime = now;
+    };
+  }
+
+  // Varmistetaan, että GPS- ja simulaatiopäivitykset kutsuvat uutta reittirelaatioilmoitusta.
+  if (typeof mdHandlePosition === 'function' && !mdHandlePosition.__routeRelationFinalFix) {
+    const before = mdHandlePosition;
+    mdHandlePosition = function(pos) {
+      before(pos);
+      if (mdState.currentLat != null && mdState.currentLon != null && typeof mdHandleRouteRelations === 'function') {
+        mdHandleRouteRelations(mdState.currentLat, mdState.currentLon);
+      }
+    };
+    mdHandlePosition.__routeRelationFinalFix = true;
+  }
+  if (typeof mdSimSet === 'function' && !mdSimSet.__routeRelationFinalFix) {
+    const beforeSim = mdSimSet;
+    mdSimSet = function(lat, lon, heading) {
+      beforeSim(lat, lon, heading);
+      if (typeof mdHandleRouteRelations === 'function') mdHandleRouteRelations(lat, lon);
+    };
+    mdSimSet.__routeRelationFinalFix = true;
+  }
+
+  // Kohdevalikon Anna reitti -painike lisätään varsinaiseen mdBuildActionMenu-funktioon aiemmin.
+
+
+  // Ilmoitukset-sivulle Lopeta navigointi -painike. Lisätään DOMiin suoraan, ei pelkällä myöhemmällä oletuksella.
+  const notif = document.getElementById('mdNotificationsPanel');
+  if (notif && !document.getElementById('mdStopNavigationBtn')) {
+    const inner = notif.querySelector('.view-inner') || notif;
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-red';
+    btn.id = 'mdStopNavigationBtn';
+    btn.type = 'button';
+    btn.textContent = 'Lopeta navigointi';
+    btn.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      if (typeof mdStopNavigation === 'function') mdStopNavigation();
+      else if (window.mdStopNavigation) window.mdStopNavigation();
+    });
+    const stopFollow = document.getElementById('mdStopFollowTargetsBtn');
+    if (stopFollow) stopFollow.insertAdjacentElement('afterend', btn);
+    else {
+      const firstGroup = inner.querySelector('.check-group');
+      if (firstGroup) inner.insertBefore(btn, firstGroup.nextSibling);
+      else inner.appendChild(btn);
+    }
+  }
+
+  // Päivitetään näkyvissä olevat listat, jotta uusi valikko tulee heti käyttöön.
+  try {
+    if (mdNearestPanel && mdNearestPanel.style.display !== 'none' && mdState.nearestGroupKey && typeof mdRenderNearestGroup === 'function') mdRenderNearestGroup();
+    if (mdOwnPlacesPanel && mdOwnPlacesPanel.style.display !== 'none' && typeof mdRenderOwnPlaces === 'function') mdRenderOwnPlaces();
+    const gpxPanel = document.getElementById('mdGpxPanel');
+    if (gpxPanel && gpxPanel.style.display !== 'none' && typeof mdRenderGpxList === 'function') mdRenderGpxList();
+  } catch(e) {}
+})();
 </script>
 </body>
 </html>
