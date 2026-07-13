@@ -4450,6 +4450,281 @@ if('serviceWorker' in navigator){
   }
 })();
 
+
+
+/* === FINAL FIX 3: pysyvämpi tallennus IndexedDB:hen ja tarkempi navigointivirhe === */
+(function(){
+  'use strict';
+
+  const MD_IDB_NAME = 'KarttaJaPaikatDB';
+  const MD_IDB_STORE = 'data';
+  const MD_IDB_KEY = 'main';
+
+  function mdAllPersistKeys() {
+    return ['roads','waters','outdoor','parking','structures','landtypes','barriers','elevations','routeRelations','ownPlaces','gpxRoutes'];
+  }
+
+  function mdBuildPersistObject() {
+    const obj = {
+      version: 6,
+      source: 'OpenStreetMap / Overpass',
+      savedAt: new Date().toISOString(),
+      loadedAt: mdState.loadedAt || null,
+      center: mdState.center || null,
+      centers: Array.isArray(mdState.centers) ? mdState.centers : []
+    };
+    for (const key of mdAllPersistKeys()) obj[key] = Array.isArray(mdState[key]) ? mdState[key] : [];
+    // GPX käyttää sisäisesti mdState.gpxRoutes, ei mdState.gpx
+    obj.gpxRoutes = Array.isArray(mdState.gpxRoutes) ? mdState.gpxRoutes : [];
+    return obj;
+  }
+
+  function mdApplyPersistObject(data) {
+    if (!data || typeof data !== 'object') return false;
+    for (const key of mdAllPersistKeys()) {
+      if (key === 'gpxRoutes') mdState.gpxRoutes = Array.isArray(data.gpxRoutes) ? data.gpxRoutes : [];
+      else mdState[key] = Array.isArray(data[key]) ? data[key] : [];
+    }
+    mdState.nextOwnPlaceId = (mdState.ownPlaces || []).reduce((m,p)=>Math.max(m, Number(p.id)||0), 0) + 1;
+    mdState.nextGpxId = (mdState.gpxRoutes || []).reduce((m,p)=>Math.max(m, Number(p.id)||0), 0) + 1;
+    mdState.loadedAt = data.loadedAt || mdState.loadedAt || null;
+    mdState.center = data.center || mdState.center || null;
+    mdState.centers = Array.isArray(data.centers) ? data.centers : (data.center ? [data.center] : []);
+    if (typeof mdUpdateCounts === 'function') mdUpdateCounts();
+    if (typeof mdRenderOwnPlaces === 'function') mdRenderOwnPlaces();
+    if (typeof mdRenderGpxList === 'function') mdRenderGpxList();
+    if (typeof mdRenderNearestGroup === 'function' && mdState.nearestGroupKey) {
+      try { mdRenderNearestGroup(); } catch(e) {}
+    }
+    return true;
+  }
+
+  function mdHasAnyPersistedData() {
+    return mdAllPersistKeys().some(key => {
+      const arr = key === 'gpxRoutes' ? mdState.gpxRoutes : mdState[key];
+      return Array.isArray(arr) && arr.length > 0;
+    });
+  }
+
+  function mdOpenDb() {
+    return new Promise((resolve, reject) => {
+      if (!('indexedDB' in window)) { reject(new Error('IndexedDB ei ole käytettävissä.')); return; }
+      const req = indexedDB.open(MD_IDB_NAME, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(MD_IDB_STORE)) db.createObjectStore(MD_IDB_STORE);
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error || new Error('IndexedDB-avaus epäonnistui.'));
+    });
+  }
+
+  async function mdIdbPut(data) {
+    const db = await mdOpenDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(MD_IDB_STORE, 'readwrite');
+      tx.objectStore(MD_IDB_STORE).put(data, MD_IDB_KEY);
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { db.close(); reject(tx.error || new Error('IndexedDB-tallennus epäonnistui.')); };
+    });
+  }
+
+  async function mdIdbGet() {
+    const db = await mdOpenDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(MD_IDB_STORE, 'readonly');
+      const req = tx.objectStore(MD_IDB_STORE).get(MD_IDB_KEY);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error || new Error('IndexedDB-luku epäonnistui.'));
+      tx.oncomplete = () => db.close();
+    });
+  }
+
+  async function mdIdbDelete() {
+    const db = await mdOpenDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(MD_IDB_STORE, 'readwrite');
+      tx.objectStore(MD_IDB_STORE).delete(MD_IDB_KEY);
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { db.close(); reject(tx.error || new Error('IndexedDB-poisto epäonnistui.')); };
+    });
+  }
+
+  const mdSaveStoredDataBeforeIdb = mdSaveStoredData;
+  mdSaveStoredData = function() {
+    const data = mdBuildPersistObject();
+    // localStorage säilytetään pienenä/vanhojen selainten varalta, mutta se voi täyttyä isoilla OSM-aineistoilla.
+    try {
+      localStorage.setItem(MD_STORAGE_KEY, JSON.stringify(data));
+    } catch(e) {
+      console.warn('localStorage-tallennus epäonnistui, käytetään IndexedDB:tä:', e);
+    }
+    mdIdbPut(data).catch(e => {
+      console.warn('IndexedDB-tallennus epäonnistui:', e);
+      try { mdSaveStoredDataBeforeIdb(); } catch(_e) {}
+      announce('Datan tallennus laitteen muistiin epäonnistui. Vie data varmuuskopioksi.');
+    });
+  };
+
+  const mdLoadStoredDataBeforeIdb = mdLoadStoredData;
+  mdLoadStoredData = function() {
+    try { mdLoadStoredDataBeforeIdb(); } catch(e) { console.warn('localStorage-lataus epäonnistui:', e); }
+    mdIdbGet().then(data => {
+      if (!data) return;
+      // IndexedDB on ensisijainen, koska se kestää isompaa aineistoa kuin localStorage.
+      mdApplyPersistObject(data);
+    }).catch(e => console.warn('IndexedDB-lataus epäonnistui:', e));
+  };
+
+  const mdClearDataBeforeIdb = mdClearData;
+  mdClearData = function() {
+    mdClearDataBeforeIdb();
+    try { localStorage.removeItem(MD_STORAGE_KEY); } catch(e) {}
+    mdIdbDelete().catch(e => console.warn('IndexedDB-poisto epäonnistui:', e));
+  };
+
+  // Jos iOS tappaa sivun taustalla ja selain lataa sen uudelleen, palautetaan data myös IndexedDB:stä.
+  window.addEventListener('pageshow', () => {
+    mdIdbGet().then(data => { if (data && !mdHasAnyPersistedData()) mdApplyPersistObject(data); }).catch(()=>{});
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      mdIdbGet().then(data => { if (data && !mdHasAnyPersistedData()) mdApplyPersistObject(data); }).catch(()=>{});
+    }
+  });
+
+  // Ajetaan palautus heti myös tämän korjauslohkon latauduttua.
+  mdIdbGet().then(data => { if (data) mdApplyPersistObject(data); }).catch(()=>{});
+
+  function navPointForFeature(key, feature, lat, lon) {
+    if (!feature) return null;
+    if (feature.lat != null && feature.lon != null) return { lat:Number(feature.lat), lon:Number(feature.lon) };
+    if (Array.isArray(feature.coords) && feature.coords.length) {
+      const nearest = mdNearestFeature([feature], lat, lon);
+      if (nearest) return { lat:nearest.closestLat, lon:nearest.closestLon };
+      return { lat:Number(feature.coords[0].lat), lon:Number(feature.coords[0].lon) };
+    }
+    return null;
+  }
+
+  function navNameForFeature(key, feature) {
+    if (!feature) return 'kohde';
+    if (feature.name) return String(feature.name).trim();
+    if (feature.tags && feature.tags.name) return String(feature.tags.name).trim();
+    if (key === 'ownPlaces') return 'Oma paikka';
+    if (key === 'gpx') return 'GPX-reitti';
+    if (key === 'routeRelations') return feature.typeText || 'Reittirelaatio';
+    return feature.typeText || 'kohde';
+  }
+
+  function navCoordKey(p) {
+    return Number(p.lat).toFixed(6) + ',' + Number(p.lon).toFixed(6);
+  }
+
+  function navBuildGraph(start, end) {
+    const graph = new Map();
+    const nodes = new Map();
+    const edges = [];
+    function addNode(id, p) {
+      if (!nodes.has(id)) nodes.set(id, { id, lat:Number(p.lat), lon:Number(p.lon) });
+      if (!graph.has(id)) graph.set(id, []);
+    }
+    function addEdge(aId, a, bId, b) {
+      if (!a || !b || isNaN(Number(a.lat)) || isNaN(Number(a.lon)) || isNaN(Number(b.lat)) || isNaN(Number(b.lon))) return;
+      addNode(aId, a); addNode(bId, b);
+      const w = haversine(Number(a.lat), Number(a.lon), Number(b.lat), Number(b.lon));
+      if (!isFinite(w) || w <= 0) return;
+      graph.get(aId).push({ to:bId, w });
+      graph.get(bId).push({ to:aId, w });
+      edges.push({ aId, bId, a:{lat:Number(a.lat), lon:Number(a.lon)}, b:{lat:Number(b.lat), lon:Number(b.lon)} });
+    }
+    for (const road of mdState.roads || []) {
+      const coords = road.coords || [];
+      for (let i=0; i<coords.length-1; i++) addEdge(navCoordKey(coords[i]), coords[i], navCoordKey(coords[i+1]), coords[i+1]);
+    }
+    if (!edges.length) return null;
+    function connectVirtual(id, p) {
+      addNode(id, p);
+      let best = null;
+      for (const e of edges) {
+        const c = mdClosestOnSegment(Number(p.lat), Number(p.lon), e.a, e.b);
+        if (!best || c.distance < best.distance) best = { e, c };
+      }
+      if (!best) return false;
+      const snap = { lat:best.c.lat, lon:best.c.lon };
+      const snapId = id + '_snap';
+      addEdge(id, p, snapId, snap);
+      addEdge(snapId, snap, best.e.aId, best.e.a);
+      addEdge(snapId, snap, best.e.bId, best.e.b);
+      return true;
+    }
+    if (!connectVirtual('START', start)) return null;
+    if (!connectVirtual('END', end)) return null;
+    return { graph, nodes, startId:'START', endId:'END' };
+  }
+
+  function navShortestPath(g) {
+    if (!g) return null;
+    const dist = new Map();
+    const prev = new Map();
+    const visited = new Set();
+    for (const id of g.graph.keys()) dist.set(id, Infinity);
+    dist.set(g.startId, 0);
+    while (true) {
+      let u = null, best = Infinity;
+      for (const [id,d] of dist.entries()) if (!visited.has(id) && d < best) { best = d; u = id; }
+      if (u == null || u === g.endId) break;
+      visited.add(u);
+      for (const edge of g.graph.get(u) || []) {
+        const nd = best + edge.w;
+        if (nd < (dist.get(edge.to) ?? Infinity)) { dist.set(edge.to, nd); prev.set(edge.to, u); }
+      }
+    }
+    if (!isFinite(dist.get(g.endId))) return null;
+    const ids = [];
+    let cur = g.endId;
+    while (cur) { ids.push(cur); if (cur === g.startId) break; cur = prev.get(cur); }
+    if (ids[ids.length-1] !== g.startId) return null;
+    ids.reverse();
+    const coords = [];
+    for (const id of ids) {
+      const n = g.nodes.get(id);
+      if (!n) continue;
+      if (!coords.length || haversine(coords[coords.length-1].lat, coords[coords.length-1].lon, n.lat, n.lon) > 0.5) coords.push({ lat:n.lat, lon:n.lon });
+    }
+    return { coords, distance:dist.get(g.endId) };
+  }
+
+  window.mdStartNavigationTo = function(key, feature) {
+    try {
+      const lat = mdState.currentLat;
+      const lon = mdState.currentLon;
+      if (lat == null || lon == null) { announce('Aloita GPS-seuranta tai simulointi ensin.'); return; }
+      if (!Array.isArray(mdState.roads) || !mdState.roads.length) { announce('Lataa ensin tiet ja polut karttadataan.'); return; }
+      const dest = navPointForFeature(key, feature, lat, lon);
+      if (!dest) { announce('Kohteen sijaintia ei voitu määrittää.'); return; }
+      const graph = navBuildGraph({ lat, lon }, dest);
+      const path = navShortestPath(graph);
+      if (!path || !Array.isArray(path.coords) || path.coords.length < 2) {
+        mdSetBanner('Reittiä ei löytynyt ladatusta karttadatasta.', 'error');
+        announce('Reittiä ei löytynyt ladatusta karttadatasta.');
+        return;
+      }
+      const name = navNameForFeature(key, feature);
+      mdState.navigationRoute = { id:'navigation:' + Date.now(), name:'Reitti: ' + name, kind:'navigation', typeText:'navigointireitti', coords:path.coords, distance:path.distance };
+      mdState.lastNavigationState = null;
+      mdState.lastNavOnSoundTime = 0;
+      mdState.lastNavOffSoundTime = 0;
+      if (typeof window.mdUpdateNavigationStatus === 'function') window.mdUpdateNavigationStatus('Navigointi käynnissä: ' + name + ', reitti ' + formatDist(path.distance) + '.');
+      mdSetBanner('Navigointi käynnissä.', 'running');
+      announce('Navigointi käynnistetty. Reitti ' + formatDist(path.distance) + '.');
+    } catch(err) {
+      console.error('Navigointivirhe:', err);
+      announce('Navigointivirhe: ' + (err && err.message ? err.message : 'tuntematon virhe'));
+    }
+  };
+})();
+
 </script>
 </body>
 </html>
