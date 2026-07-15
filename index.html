@@ -234,7 +234,7 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
 .load-options { display:grid; grid-template-columns:1fr; gap:.45rem; }
 .small-grid { display:grid; grid-template-columns:1fr 1fr; gap:.45rem; }
 .sr-friendly-hidden { display:none !important; }
-#mdRoadStatus, #mdWaterStatus, #mdOwnPlaceStatus, #mdGpxStatus { font-size:.82rem; padding:.6rem .75rem; min-height:44px; }
+#mdRoadStatus, #mdWaterStatus, #mdFollowStatus { font-size:.82rem; padding:.6rem .75rem; min-height:44px; }
 #mdDataInfoContent .stats { margin-top:.5rem; }
 
 </style>
@@ -518,15 +518,21 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
 
   <div class="info-box" id="mdRoadStatus" aria-label="Tie- ja polkutieto" role="status" aria-live="off">Lataa kartta ja aloita GPS-seuranta.</div>
   <div class="info-box" id="mdWaterStatus" aria-label="Vesistötieto" role="status" aria-live="off">Lähin vesistö näytetään seurannan aikana.</div>
-  <div class="info-box" id="mdGpxStatus" aria-label="GPX-reittitieto" role="status" aria-live="off">GPX-reitti näytetään, kun reitti on tuotu tai tallennettu.</div>
-  <div class="info-box" id="mdOwnPlaceStatus" aria-label="Lähin oma paikka" role="status" aria-live="off">Lähin oma paikka näytetään seurannan aikana.</div>
-
-  <div class="check-group compact-checks" role="group" aria-label="Suunta-asetukset">
-    <label class="check-row"><input type="checkbox" id="mdUserDirCb"><span>Kerro oma liikkumissuunta</span></label>
-    <label class="check-row"><input type="checkbox" id="mdRouteDirCb"><span>Kerro reitin kulkusuunta</span></label>
-  </div>
+  <div class="info-box" id="mdFollowStatus" aria-label="Seurattavat kohteet" role="status" aria-live="off">Ei seurattavia kohteita.</div>
 
   <button class="btn btn-blue" onclick="openHelp()" aria-label="Ohje">Ohje</button>
+
+  <button class="btn btn-blue" id="mdHomeSimulationBtn" aria-expanded="false" aria-controls="mdHomeSimulationControls">Paikan simulointi</button>
+  <div class="save-form" id="mdHomeSimulationControls" style="display:none" role="region" aria-label="Paikan simuloinnin pikaohjaus">
+    <span class="save-form-title">Paikan simulointi</span>
+    <div class="small-grid">
+      <button class="btn btn-blue" id="mdHomeSimNorthBtn">Pohjoiseen</button>
+      <button class="btn btn-blue" id="mdHomeSimEastBtn">Itään</button>
+      <button class="btn btn-blue" id="mdHomeSimSouthBtn">Etelään</button>
+      <button class="btn btn-blue" id="mdHomeSimWestBtn">Länteen</button>
+    </div>
+    <button class="btn btn-red" id="mdHomeSimStopBtn">Lopeta simulointi</button>
+  </div>
 
   <div class="hint">Karttadata © OpenStreetMapin tekijät. Tieto voi olla puutteellista.</div>
 
@@ -555,7 +561,7 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
   </div>
 
   <div class="full-view" id="mdNotificationsPanel" style="display:none" role="region" aria-label="Ilmoitukset">
-    <div class="view-inner"><div class="view-header"><button class="btn btn-yellow back-btn" type="button" data-back>Takaisin</button><span class="view-title">Ilmoitukset</span></div><p class="hint">Valinta määrää, mistä kategorioista annetaan automaattinen 15 metrin puheilmoitus. Tiet ja polut sekä GPX vaikuttavat myös reitillä/poissa reitiltä -ilmoituksiin.</p><div class="check-group" role="radiogroup" aria-label="Suuntaohjeiden tapa"><label class="check-row"><input type="radio" name="mdDirectionMode" id="mdDirectionCardinal" value="cardinal" checked><span>Ilmansuunnat</span></label><label class="check-row"><input type="radio" name="mdDirectionMode" id="mdDirectionClock" value="clock"><span>Kellotaulu</span></label></div><div class="check-group" role="group" aria-label="Ilmoitettavat kategoriat"><label class="check-row"><input type="checkbox" id="mdOwnPlacesCb" checked><span>Omat paikat</span></label><label class="check-row"><input type="checkbox" id="mdGpxCb" checked><span>GPX</span></label><label class="check-row"><input type="checkbox" id="mdRoadsCb" checked><span>Tiet ja polut</span></label><label class="check-row"><input type="checkbox" id="mdWaterCb" checked><span>Vesistöt</span></label><label class="check-row"><input type="checkbox" id="mdOutdoorCb" checked><span>Retkeilykohteet</span></label><label class="check-row"><input type="checkbox" id="mdParkingCb" checked><span>Pysäköinti</span></label><label class="check-row"><input type="checkbox" id="mdStructuresCb" checked><span>Rakennukset ja rakenteet</span></label><label class="check-row"><input type="checkbox" id="mdLandtypesCb" checked><span>Maastotyypit</span></label><label class="check-row"><input type="checkbox" id="mdBarriersCb" checked><span>Esteet ja rajoitukset</span></label><label class="check-row"><input type="checkbox" id="mdElevationsCb" checked><span>Korkeustagit</span></label></div></div>
+    <div class="view-inner"><div class="view-header"><button class="btn btn-yellow back-btn" type="button" data-back>Takaisin</button><span class="view-title">Ilmoitukset</span></div><p class="hint">Valinta määrää, mistä kategorioista annetaan automaattinen 15 metrin puheilmoitus. Tiet ja polut sekä GPX vaikuttavat myös reitillä/poissa reitiltä -ilmoituksiin.</p><div class="check-group" role="radiogroup" aria-label="Suuntaohjeiden tapa"><label class="check-row"><input type="radio" name="mdDirectionMode" id="mdDirectionCardinal" value="cardinal" checked><span>Ilmansuunnat</span></label><label class="check-row"><input type="radio" name="mdDirectionMode" id="mdDirectionClock" value="clock"><span>Kellotaulu</span></label></div><div class="check-group compact-checks" role="group" aria-label="Reitti- ja liikkumissuunnan ilmoitukset"><label class="check-row"><input type="checkbox" id="mdUserDirCb"><span>Kerro oma liikkumissuunta</span></label><label class="check-row"><input type="checkbox" id="mdRouteDirCb"><span>Kerro reitin kulkusuunta</span></label></div><div class="check-group" role="group" aria-label="Ilmoitettavat kategoriat"><label class="check-row"><input type="checkbox" id="mdOwnPlacesCb" checked><span>Omat paikat</span></label><label class="check-row"><input type="checkbox" id="mdGpxCb"><span>GPX</span></label><label class="check-row"><input type="checkbox" id="mdRoadsCb" checked><span>Tiet ja polut</span></label><label class="check-row"><input type="checkbox" id="mdWaterCb" checked><span>Vesistöt</span></label><label class="check-row"><input type="checkbox" id="mdOutdoorCb" checked><span>Retkeilykohteet</span></label><label class="check-row"><input type="checkbox" id="mdParkingCb"><span>Pysäköinti</span></label><label class="check-row"><input type="checkbox" id="mdStructuresCb"><span>Rakennukset ja rakenteet</span></label><label class="check-row"><input type="checkbox" id="mdLandtypesCb"><span>Maastotyypit</span></label><label class="check-row"><input type="checkbox" id="mdBarriersCb"><span>Esteet ja rajoitukset</span></label><label class="check-row"><input type="checkbox" id="mdElevationsCb"><span>Korkeustagit</span></label></div></div>
   </div>
 
   <div class="full-view" id="mdNearestPanel" style="display:none" role="region" aria-label="Lähimmät kohteet"><div class="view-inner"><div class="view-header"><button class="btn btn-yellow back-btn" type="button" data-back>Takaisin</button><span class="view-title" id="mdNearestTitle">Lähimmät</span></div><div id="mdNearestList" class="nearest-list" role="list"><p class="places-empty" id="mdNearestEmpty">Ei kohteita.</p></div><button class="btn btn-blue" id="mdNearestMoreBtn" style="display:none">Näytä lisää</button></div></div>
@@ -3840,5 +3846,142 @@ if('serviceWorker' in navigator){
 })();
 
 </script>
+
+<script>
+/* === 15.7.2026 jatkokehitys: seurattavien kohteiden ruutu ja simuloinnin pikaohjaus === */
+(function(){
+  'use strict';
+
+  const followStatus = document.getElementById('mdFollowStatus');
+  const simLatInput = document.getElementById('mdSimLatInput');
+  const simLonInput = document.getElementById('mdSimLonInput');
+
+  function listForFollowGroup(group) {
+    const map = {
+      ownPlaces:'ownPlaces', gpx:'gpxRoutes', roads:'roads', waters:'waters',
+      outdoor:'outdoor', parking:'parking', structures:'structures', landtypes:'landtypes',
+      barriers:'barriers', elevations:'elevations', routeRelations:'routeRelations'
+    };
+    return mdState[map[group]] || [];
+  }
+  function followKey(group, feature) {
+    const name = feature && feature.name ? feature.name : (feature ? mdFeatureName(feature) : 'Kohde');
+    const id = feature && feature.id != null ? feature.id : name;
+    return group + ':' + String(id);
+  }
+  function findFollowFeature(target) {
+    return listForFollowGroup(target.group).find(f => followKey(target.group, f) === target.key) || null;
+  }
+  function nearestFollowInfo(feature, lat, lon) {
+    if (!feature || lat == null || lon == null) return null;
+    if (Array.isArray(feature.coords) && feature.coords.length) return mdNearestFeature([feature], lat, lon);
+    if (feature.lat != null && feature.lon != null) {
+      return { distance:haversine(lat, lon, Number(feature.lat), Number(feature.lon)), closestLat:Number(feature.lat), closestLon:Number(feature.lon) };
+    }
+    return null;
+  }
+  function updateFollowStatus() {
+    if (!followStatus) return;
+    const lat = mdState.currentLat, lon = mdState.currentLon;
+    const rows = [];
+    mdState.followTargets = (mdState.followTargets || []).filter(t => !!findFollowFeature(t));
+    for (const target of mdState.followTargets) {
+      const feature = findFollowFeature(target);
+      const nearest = nearestFollowInfo(feature, lat, lon);
+      const name = target.name || (feature && (feature.name || mdFeatureName(feature))) || 'Kohde';
+      if (!nearest || lat == null || lon == null) rows.push(name);
+      else {
+        const dist = nearest.distance >= 1000 ? (nearest.distance/1000).toFixed(1) + ' km' : Math.round(nearest.distance) + ' m';
+        const dir = mdDirectionFromTo(lat, lon, nearest.closestLat, nearest.closestLon);
+        rows.push(name + ': ' + dist + ' ' + dir);
+      }
+    }
+    followStatus.textContent = rows.length ? rows.join('. ') + '.' : 'Ei seurattavia kohteita.';
+  }
+  window.mdUpdateFollowStatus = updateFollowStatus;
+
+  function syncSimulationCoordinates(lat, lon) {
+    if (simLatInput && Number.isFinite(Number(lat))) simLatInput.value = Number(lat).toFixed(6);
+    if (simLonInput && Number.isFinite(Number(lon))) simLonInput.value = Number(lon).toFixed(6);
+  }
+
+  const originalSimSet = mdSimSet;
+  mdSimSet = function(lat, lon, heading) {
+    originalSimSet(lat, lon, heading);
+    syncSimulationCoordinates(lat, lon);
+    updateFollowStatus();
+  };
+
+  const originalHandlePosition = mdHandlePosition;
+  mdHandlePosition = function(pos) {
+    originalHandlePosition(pos);
+    updateFollowStatus();
+  };
+
+  // Siirretään suuntavalinnat Ilmoitukset-sivulle seurannan lopetuspainikkeen jälkeen.
+  const notificationsInner = document.querySelector('#mdNotificationsPanel .view-inner');
+  const stopFollowBtn = document.getElementById('mdStopFollowTargetsBtn');
+  const firstCategory = document.getElementById('mdOwnPlacesCb');
+  const categoryGroup = firstCategory ? firstCategory.closest('.check-group') : null;
+  if (notificationsInner && document.getElementById('mdUserDirCb') && document.getElementById('mdRouteDirCb')) {
+    const directionGroup = document.createElement('div');
+    directionGroup.className = 'check-group compact-checks';
+    directionGroup.setAttribute('role','group');
+    directionGroup.setAttribute('aria-label','Reitti- ja liikkumissuunnan ilmoitukset');
+    directionGroup.appendChild(document.getElementById('mdUserDirCb').closest('label'));
+    directionGroup.appendChild(document.getElementById('mdRouteDirCb').closest('label'));
+    if (stopFollowBtn) stopFollowBtn.insertAdjacentElement('afterend', directionGroup);
+    else if (categoryGroup) notificationsInner.insertBefore(directionGroup, categoryGroup);
+  }
+
+  // Reittirelaatiot lisätään dynaamisesti vanhassa koodissa: pidetään se oletuksena aktiivisena.
+  const routeRelationsCb = document.getElementById('mdRouteRelationsCb');
+  if (routeRelationsCb) routeRelationsCb.checked = true;
+  ['mdOwnPlacesCb','mdRoadsCb','mdWaterCb','mdOutdoorCb'].forEach(id => { const el=document.getElementById(id); if(el) el.checked=true; });
+  ['mdGpxCb','mdParkingCb','mdStructuresCb','mdLandtypesCb','mdBarriersCb','mdElevationsCb'].forEach(id => { const el=document.getElementById(id); if(el) el.checked=false; });
+
+  // Perusnäytön simulointipainikkeet. Ensimmäinen ilmansuuntapainallus käynnistää simuloinnin nykyisestä tunnetusta sijainnista.
+  const homeToggle = document.getElementById('mdHomeSimulationBtn');
+  const homeControls = document.getElementById('mdHomeSimulationControls');
+  if (homeToggle && homeControls) homeToggle.addEventListener('click', () => {
+    const open = homeControls.style.display === 'none';
+    homeControls.style.display = open ? '' : 'none';
+    homeToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  async function homeMove(dir) {
+    if (!mdState.simulationMode) {
+      let lat = mdState.currentLat, lon = mdState.currentLon;
+      if ((lat == null || lon == null) && navigator.geolocation) {
+        try { const pos = await mdGetCurrentPosition(); lat=pos.coords.latitude; lon=pos.coords.longitude; }
+        catch(e) { announce('Nykyistä sijaintia ei saatu.'); return; }
+      }
+      if (lat == null || lon == null) { announce('Nykyistä sijaintia ei ole.'); return; }
+      mdSimSet(lat, lon, null);
+    }
+    mdMoveSim(dir);
+  }
+  [['North','N'],['East','E'],['South','S'],['West','W']].forEach(([name,dir]) => {
+    const btn=document.getElementById('mdHomeSim'+name+'Btn');
+    if(btn) btn.addEventListener('click',()=>homeMove(dir));
+  });
+  function stopSimulation() {
+    mdState.simulationMode=false;
+    mdSetMovementBearingFromSimulation(null);
+    mdSetBanner('Simulointi lopetettu. Aloita GPS-seuranta palataksesi omaan sijaintiin.','idle');
+    announce('Simulointi lopetettu.');
+  }
+  const homeStop=document.getElementById('mdHomeSimStopBtn');
+  if(homeStop) homeStop.addEventListener('click',stopSimulation);
+
+  // Päivitä tietoruutu myös seurannan valintojen muuttuessa.
+  document.addEventListener('click', e => {
+    if (e.target && (e.target.textContent === 'Seuraa' || e.target.textContent === 'Lopeta seuraaminen' || e.target.id === 'mdStopFollowTargetsBtn')) {
+      setTimeout(updateFollowStatus, 0);
+    }
+  });
+  updateFollowStatus();
+})();
+</script>
+
 </body>
 </html>
