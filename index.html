@@ -3744,14 +3744,18 @@ if('serviceWorker' in navigator){
 
   function normalizedName(f){ return (mdFeatureName(f)||'').trim().toLocaleLowerCase('fi-FI'); }
   function uniqueNearestByName(list,lat,lon){
-    const best=new Map(), unnamed=[];
+    const byName=new Map(), unnamed=[];
     for(const f of (list||[])){
       const n=mdNearestFeature([f],lat,lon); if(!n) continue;
       const key=normalizedName(f);
       if(!key){ unnamed.push(n); continue; }
-      const prev=best.get(key); if(!prev||n.distance<prev.distance) best.set(key,n);
+      const group=byName.get(key)||[];
+      group.push(n);
+      group.sort((a,b)=>a.distance-b.distance);
+      if(group.length>2) group.length=2;
+      byName.set(key,group);
     }
-    return [...best.values(),...unnamed].sort((a,b)=>a.distance-b.distance);
+    return [...byName.values()].flat().concat(unnamed).sort((a,b)=>a.distance-b.distance);
   }
   mdTopNearestFeatures=function(list,lat,lon,limit){ return uniqueNearestByName(list,lat,lon).slice(0,limit||10); };
 
@@ -3999,6 +4003,7 @@ if('serviceWorker' in navigator){
     if(group==='roads') return mdState.roads||[];
     if(group==='routeRelations') return mdState.routeRelations||[];
     if(group==='gpx') return mdState.gpxRoutes||[];
+    if(group==='waters') return mdState.waters||[];
     return [];
   }
   function targetKey(group, f){
@@ -4045,7 +4050,7 @@ if('serviceWorker' in navigator){
     return out;
   }
   function summarizeDirections(path){
-    if(path.length<2) return 'Reitti päättyy tähän.';
+    if(path.length<2) return 'Kohde päättyy tähän.';
     const runs=[];
     for(let i=1;i<path.length;i++){
       const a=path[i-1],b=path[i], label=cardinal8(bearingDeg(a.lat,a.lon,b.lat,b.lon));
@@ -4054,7 +4059,7 @@ if('serviceWorker' in navigator){
       else runs[runs.length-1].len+=len;
     }
     const useful=runs.filter(r=>r.len>=8);
-    if(!useful.length) return 'Reitti jatkuu vain lyhyen matkan.';
+    if(!useful.length) return 'Kohde jatkuu vain lyhyen matkan.';
     return useful.slice(0,8).map((r,i)=>(i===0?'Ensin ':'sitten ')+r.label+' '+compactDistance(r.len)).join(', ')+'.';
   }
   function lineIntersection(a,b,c,d,ref){
@@ -4087,7 +4092,7 @@ if('serviceWorker' in navigator){
     }
     return found.sort((a,b)=>a.d-b.d).slice(0,10);
   }
-  function nearbyItems(path){
+  function nearbyItems(feature,path){
     const groups=[
       ['vesistö',mdState.waters||[]],
       ['rakennus tai rakenne',mdState.structures||[]],
@@ -4096,6 +4101,7 @@ if('serviceWorker' in navigator){
     const found=[];
     for(const [kind,list] of groups){
       for(const f of list){
+        if(f===feature) continue;
         let best=Infinity,bestD=0;
         for(const p of path){
           const n=mdNearestFeature([f],p.lat,p.lon); if(n&&n.distance<best){best=n.distance;bestD=p.d;}
@@ -4113,8 +4119,8 @@ if('serviceWorker' in navigator){
 
   const panel=document.createElement('div');
   panel.className='full-view'; panel.id='mdExploreRoutePanel'; panel.style.display='none';
-  panel.setAttribute('role','region'); panel.setAttribute('aria-label','Tutki reittiä');
-  panel.innerHTML='<div class="view-inner"><div class="view-header"><button class="btn btn-yellow back-btn" type="button" data-explore-back>Takaisin</button><span class="view-title">Tutki reittiä</span></div><div class="info-box" id="mdExploreRouteName"></div><div class="field"><label for="mdExploreDistance">Tarkastelumatka</label><select id="mdExploreDistance"><option value="200">200 m</option><option value="500" selected>500 m</option><option value="1000">1 km</option><option value="2000">2 km</option><option value="5000">5 km</option></select></div><div class="btn-row"><button class="btn btn-blue" id="mdExploreDirBack">Suunta 1</button><button class="btn btn-blue" id="mdExploreDirForward">Suunta 2</button></div><div class="info-box" id="mdExploreSummary" role="status" aria-live="polite">Valitse suunta.</div></div>';
+  panel.setAttribute('role','region'); panel.setAttribute('aria-label','Tutki kulkua');
+  panel.innerHTML='<div class="view-inner"><div class="view-header"><button class="btn btn-yellow back-btn" type="button" data-explore-back>Takaisin</button><span class="view-title" id="mdExploreTitle">Tutki reittiä</span></div><div class="info-box" id="mdExploreRouteName"></div><div class="field"><label for="mdExploreDistance">Tarkastelumatka</label><select id="mdExploreDistance"><option value="200">200 m</option><option value="500" selected>500 m</option><option value="1000">1 km</option><option value="2000">2 km</option><option value="5000">5 km</option></select></div><div class="btn-row"><button class="btn btn-blue" id="mdExploreDirBack">Suunta 1</button><button class="btn btn-blue" id="mdExploreDirForward">Suunta 2</button></div><div class="info-box" id="mdExploreSummary" role="status" aria-live="polite">Valitse suunta.</div></div>';
   document.getElementById('panel-map').appendChild(panel);
   panel.querySelector('[data-explore-back]').addEventListener('click',()=>{panel.style.display='none';});
   let explore={group:null,feature:null,nearest:null,sign:1};
@@ -4135,7 +4141,7 @@ if('serviceWorker' in navigator){
     let text=summarizeDirections(path);
     const crossings=routeCrossings(explore.feature,path);
     if(crossings.length) text+=' Risteykset: '+crossings.map(x=>compactDistance(x.d)+' '+x.name).join(', ')+'.';
-    const nearby=nearbyItems(path);
+    const nearby=nearbyItems(explore.feature,path);
     if(nearby.length) text+=' Lähellä: '+nearby.map(x=>compactDistance(x.d)+' '+x.name).join(', ')+'.';
     if(!crossings.length&&!nearby.length) text+=' Ei risteyksiä tai valittuja lähikohteita.';
     document.getElementById('mdExploreSummary').textContent=text;
@@ -4144,9 +4150,12 @@ if('serviceWorker' in navigator){
     const lat=mdState.currentLat,lon=mdState.currentLon;
     if(lat==null||lon==null){announce('Aloita GPS-seuranta tai simulointi ensin.');return;}
     const nearest=projectFromNearest(feature,lat,lon);
-    if(!nearest){announce('Reitin geometriaa ei voitu tutkia.');return;}
+    if(!nearest){announce('Kohteen geometriaa ei voitu tutkia.');return;}
     explore={group,feature,nearest,sign:1};
-    document.getElementById('mdExploreRouteName').textContent=mdFeatureName(feature)||'Reitti';
+    const water=group==='waters';
+    document.getElementById('mdExploreTitle').textContent=water?'Tutki kulkua':'Tutki reittiä';
+    panel.setAttribute('aria-label',water?'Tutki vesistön kulkua':'Tutki reittiä');
+    document.getElementById('mdExploreRouteName').textContent=mdFeatureName(feature)||(water?'Vesistö':'Reitti');
     updateDirectionButtons(); renderExplore(); panel.style.display=''; panel.querySelector('[data-explore-back]').focus();
   }
   document.getElementById('mdExploreDirBack').addEventListener('click',()=>{explore.sign=-1;renderExplore();});
@@ -4157,12 +4166,40 @@ if('serviceWorker' in navigator){
     if(!menu||menu.querySelector('.md-explore-route-btn'))return;
     const row=menu.closest('[data-target-key]'); if(!row)return;
     const key=row.dataset.targetKey||'', group=key.split(':')[0];
-    if(!['roads','routeRelations','gpx'].includes(group))return;
+    if(!['roads','routeRelations','gpx','waters'].includes(group))return;
     const feature=findFeature(group,key); if(!feature||!Array.isArray(feature.coords)||feature.coords.length<2)return;
-    const btn=document.createElement('button'); btn.className='btn btn-blue md-explore-route-btn'; btn.textContent='Tutki reittiä';
+    const btn=document.createElement('button'); btn.className='btn btn-blue md-explore-route-btn'; btn.textContent=group==='waters'?'Tutki kulkua':'Tutki reittiä';
     btn.addEventListener('click',e=>{e.stopPropagation();openExplore(group,feature);});
     menu.insertBefore(btn,menu.firstChild.nextSibling||menu.firstChild);
   }
+  function makeInfoBoxExplorable(el, label, opener){
+    if(!el) return;
+    el.tabIndex=0; el.setAttribute('role','button'); el.setAttribute('aria-label',label);
+    el.style.cursor='pointer';
+    const activate=e=>{ if(e.type==='keydown'&&e.key!=='Enter'&&e.key!==' ') return; if(e.type==='keydown') e.preventDefault(); opener(); };
+    el.addEventListener('click',activate); el.addEventListener('keydown',activate);
+  }
+  makeInfoBoxExplorable(document.getElementById('mdRoadStatus'),'Tutki lähimmän reitin kulkua',()=>{
+    const lat=mdState.currentLat,lon=mdState.currentLon;
+    if(lat==null||lon==null){announce('Aloita GPS-seuranta tai simulointi ensin.');return;}
+    const road=mdNearestFeature(mdState.roads||[],lat,lon);
+    const relation=mdNearestFeature(mdState.routeRelations||[],lat,lon);
+    let nearest=null, group='roads';
+    if(relation&&relation.distance<=MD_ROUTE_THRESHOLD_M&&(!road||road.distance>MD_ROUTE_THRESHOLD_M||relation.distance<=road.distance+1)){
+      nearest=relation; group='routeRelations';
+    }else if(road){ nearest=road; group='roads'; }
+    else if(relation){ nearest=relation; group='routeRelations'; }
+    if(!nearest){announce('Lähintä reittiä ei ole.');return;}
+    openExplore(group,nearest.feature);
+  });
+  makeInfoBoxExplorable(document.getElementById('mdWaterStatus'),'Tutki lähimmän vesistön kulkua',()=>{
+    const lat=mdState.currentLat,lon=mdState.currentLon;
+    if(lat==null||lon==null){announce('Aloita GPS-seuranta tai simulointi ensin.');return;}
+    const nearest=mdNearestFeature(mdState.waters||[],lat,lon);
+    if(!nearest){announce('Lähintä vesistöä ei ole.');return;}
+    openExplore('waters',nearest.feature);
+  });
+
   const observer=new MutationObserver(ms=>{for(const m of ms)for(const n of m.addedNodes){if(n.nodeType!==1)continue;if(n.matches&&n.matches('.target-action-menu'))injectExploreButton(n);n.querySelectorAll&&n.querySelectorAll('.target-action-menu').forEach(injectExploreButton);}});
   observer.observe(document.body,{childList:true,subtree:true});
 
