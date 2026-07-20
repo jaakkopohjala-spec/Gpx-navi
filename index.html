@@ -4174,7 +4174,10 @@ if('serviceWorker' in navigator){
   }
   function makeInfoBoxExplorable(el, label, opener){
     if(!el) return;
-    el.tabIndex=0; el.setAttribute('role','button'); el.setAttribute('aria-label',label);
+    el.tabIndex=0; el.setAttribute('role','button');
+    // Älä korvaa tietoruudun sisältöä erillisellä saavutettavalla nimellä.
+    // VoiceOver lukee näin saman muuttuvan reitti- tai vesistötiedon kuin ennenkin.
+    el.removeAttribute('aria-label');
     el.style.cursor='pointer';
     const activate=e=>{ if(e.type==='keydown'&&e.key!=='Enter'&&e.key!==' ') return; if(e.type==='keydown') e.preventDefault(); opener(); };
     el.addEventListener('click',activate); el.addEventListener('keydown',activate);
