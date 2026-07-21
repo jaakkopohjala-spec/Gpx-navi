@@ -235,6 +235,10 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
 .small-grid { display:grid; grid-template-columns:1fr 1fr; gap:.45rem; }
 .sr-friendly-hidden { display:none !important; }
 #mdRoadStatus, #mdWaterStatus, #mdFollowStatus { font-size:.82rem; padding:.6rem .75rem; min-height:44px; }
+.info-action-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.5rem; align-items:stretch; }
+.info-action-row .info-box { min-width:0; }
+.info-action-row .info-action-btn { width:auto; min-width:86px; min-height:44px; padding:0 .7rem; font-size:.78rem; }
+@media (max-width:360px) { .info-action-row { grid-template-columns:1fr; } .info-action-row .info-action-btn { width:100%; } }
 #mdDataInfoContent .stats { margin-top:.5rem; }
 
 </style>
@@ -516,9 +520,18 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
     <span id="mdBannerText">Karttadataa ei ole vielä ladattu.</span>
   </div>
 
-  <div class="info-box" id="mdRoadStatus" aria-label="Tie- ja polkutieto" role="status" aria-live="off">Lataa kartta ja aloita GPS-seuranta.</div>
-  <div class="info-box" id="mdWaterStatus" aria-label="Vesistötieto" role="status" aria-live="off">Lähin vesistö näytetään seurannan aikana.</div>
-  <div class="info-box" id="mdFollowStatus" aria-label="Seurattavat kohteet" role="status" aria-live="off">Ei seurattavia kohteita.</div>
+  <div class="info-action-row">
+    <div class="info-box" id="mdRoadStatus" role="status" aria-live="off">Lataa kartta ja aloita GPS-seuranta.</div>
+    <button class="btn btn-blue info-action-btn" id="mdExploreNearestRoadBtn" type="button">Tutki</button>
+  </div>
+  <div class="info-action-row">
+    <div class="info-box" id="mdWaterStatus" role="status" aria-live="off">Lähin vesistö näytetään seurannan aikana.</div>
+    <button class="btn btn-blue info-action-btn" id="mdExploreNearestWaterBtn" type="button">Tutki</button>
+  </div>
+  <div class="info-action-row">
+    <div class="info-box" id="mdFollowStatus" aria-label="Seurattavat kohteet" role="status" aria-live="off">Ei seurattavia kohteita.</div>
+    <button class="btn btn-red info-action-btn" id="mdClearFollowTargetsBtn" type="button">Lopeta seuraaminen</button>
+  </div>
 
   <button class="btn btn-blue" onclick="openHelp()" aria-label="Ohje">Ohje</button>
 
@@ -3352,6 +3365,7 @@ mdGpsToggle.addEventListener('click', async () => {
   function mdStopAllFollowTargets(){
     mdState.followTargets = [];
     mdState.lastFollowSpeakTime = 0;
+    if (typeof window.mdUpdateFollowStatus === 'function') window.mdUpdateFollowStatus();
     announce('Kohteiden seuraaminen lopetettu.');
     if (mdNearestPanel && mdNearestPanel.style.display !== 'none') mdRenderNearestGroup();
     if (mdOwnPlacesPanel && mdOwnPlacesPanel.style.display !== 'none') mdRenderOwnPlaces();
@@ -3634,6 +3648,9 @@ mdGpsToggle.addEventListener('click', async () => {
 
   // Ilmoitukset-sivulle kohteiden seurannan nollaus.
   const notif = document.getElementById('mdNotificationsPanel');
+  const homeClearFollowBtn = document.getElementById('mdClearFollowTargetsBtn');
+  if (homeClearFollowBtn) homeClearFollowBtn.addEventListener('click', mdStopAllFollowTargets);
+
   if (notif && !document.getElementById('mdStopFollowTargetsBtn')) {
     const inner = notif.querySelector('.view-inner') || notif;
     const btn = document.createElement('button');
@@ -4172,17 +4189,7 @@ if('serviceWorker' in navigator){
     btn.addEventListener('click',e=>{e.stopPropagation();openExplore(group,feature);});
     menu.insertBefore(btn,menu.firstChild.nextSibling||menu.firstChild);
   }
-  function makeInfoBoxExplorable(el, label, opener){
-    if(!el) return;
-    el.tabIndex=0; el.setAttribute('role','button');
-    // Älä korvaa tietoruudun sisältöä erillisellä saavutettavalla nimellä.
-    // VoiceOver lukee näin saman muuttuvan reitti- tai vesistötiedon kuin ennenkin.
-    el.removeAttribute('aria-label');
-    el.style.cursor='pointer';
-    const activate=e=>{ if(e.type==='keydown'&&e.key!=='Enter'&&e.key!==' ') return; if(e.type==='keydown') e.preventDefault(); opener(); };
-    el.addEventListener('click',activate); el.addEventListener('keydown',activate);
-  }
-  makeInfoBoxExplorable(document.getElementById('mdRoadStatus'),'Tutki lähimmän reitin kulkua',()=>{
+  function openNearestRoadExplore(){
     const lat=mdState.currentLat,lon=mdState.currentLon;
     if(lat==null||lon==null){announce('Aloita GPS-seuranta tai simulointi ensin.');return;}
     const road=mdNearestFeature(mdState.roads||[],lat,lon);
@@ -4194,14 +4201,18 @@ if('serviceWorker' in navigator){
     else if(relation){ nearest=relation; group='routeRelations'; }
     if(!nearest){announce('Lähintä reittiä ei ole.');return;}
     openExplore(group,nearest.feature);
-  });
-  makeInfoBoxExplorable(document.getElementById('mdWaterStatus'),'Tutki lähimmän vesistön kulkua',()=>{
+  }
+  function openNearestWaterExplore(){
     const lat=mdState.currentLat,lon=mdState.currentLon;
     if(lat==null||lon==null){announce('Aloita GPS-seuranta tai simulointi ensin.');return;}
     const nearest=mdNearestFeature(mdState.waters||[],lat,lon);
     if(!nearest){announce('Lähintä vesistöä ei ole.');return;}
     openExplore('waters',nearest.feature);
-  });
+  }
+  const exploreRoadBtn=document.getElementById('mdExploreNearestRoadBtn');
+  const exploreWaterBtn=document.getElementById('mdExploreNearestWaterBtn');
+  if(exploreRoadBtn) exploreRoadBtn.addEventListener('click',openNearestRoadExplore);
+  if(exploreWaterBtn) exploreWaterBtn.addEventListener('click',openNearestWaterExplore);
 
   const observer=new MutationObserver(ms=>{for(const m of ms)for(const n of m.addedNodes){if(n.nodeType!==1)continue;if(n.matches&&n.matches('.target-action-menu'))injectExploreButton(n);n.querySelectorAll&&n.querySelectorAll('.target-action-menu').forEach(injectExploreButton);}});
   observer.observe(document.body,{childList:true,subtree:true});
