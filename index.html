@@ -4047,24 +4047,70 @@ if('serviceWorker' in navigator){
     }
     return {used,done:used>=remaining-0.01};
   }
-  function buildDirectionPath(feature, nearest, sign, maxDistance){
-    const c=feature.coords||[];
-    if(c.length<2) return [];
-    const i=nearest.segmentIndex;
-    const start={lat:nearest.closestLat,lon:nearest.closestLon,d:0};
-    const out=[start]; let total=0;
-    if(sign>0){
-      let a=start;
-      for(let idx=i+1;idx<c.length;idx++){
-        const r=appendInterpolated(out,a,c[idx],total,maxDistance); total+=r.used; if(r.done)break; a=c[idx];
-      }
-    }else{
-      let a=start;
-      for(let idx=i;idx>=0;idx--){
-        const r=appendInterpolated(out,a,c[idx],total,maxDistance); total+=r.used; if(r.done)break; a=c[idx];
+  function endpointKey(p){ return Math.round(p.lat*1e6)+':'+Math.round(p.lon*1e6); }
+  function baseRelationId(f){ return String((f&&f.id)||'').replace(/:\d+$/,''); }
+  function routeRef(f){ return String((f&&f.tags&&f.tags.ref)||'').trim().toLocaleLowerCase('fi-FI'); }
+  function routeHighway(f){ return String((f&&f.tags&&f.tags.highway)||'').trim(); }
+  function angleDifference(a,b){ let d=Math.abs((((a-b)%360)+540)%360-180); return d; }
+  function endpointCandidates(group, currentFeature, endpoint, incomingBearing, visited){
+    const list=routeListFor(group), out=[];
+    for(const f of list){
+      if(!f||f===currentFeature||visited.has(targetKey(group,f))||!Array.isArray(f.coords)||f.coords.length<2) continue;
+      for(const atStart of [true,false]){
+        const ep=atStart?f.coords[0]:f.coords[f.coords.length-1];
+        const gap=haversine(endpoint.lat,endpoint.lon,ep.lat,ep.lon);
+        if(gap>5) continue;
+        const next=atStart?f.coords[1]:f.coords[f.coords.length-2];
+        const bearing=bearingDeg(ep.lat,ep.lon,next.lat,next.lon);
+        const turn=angleDifference(incomingBearing,bearing);
+        let score=Math.max(0,30-turn/6)-gap*2;
+        if(group==='routeRelations'&&baseRelationId(f)===baseRelationId(currentFeature)) score+=100;
+        const n1=normalized(f),n2=normalized(currentFeature); if(n1&&n1===n2) score+=50;
+        const r1=routeRef(f),r2=routeRef(currentFeature); if(r1&&r1===r2) score+=40;
+        const h1=routeHighway(f),h2=routeHighway(currentFeature); if(h1&&h1===h2) score+=20;
+        out.push({feature:f,atStart,gap,bearing,turn,score,name:mdFeatureName(f)||'nimetön reitti'});
       }
     }
-    return out;
+    return out.sort((a,b)=>b.score-a.score||a.gap-b.gap);
+  }
+  function appendFeatureDirection(out, feature, fromStart, total, maxDistance){
+    const c=feature.coords||[]; let a=fromStart?c[0]:c[c.length-1];
+    const indices=fromStart?[...Array(c.length-1).keys()].map(i=>i+1):[...Array(c.length-1).keys()].map(i=>c.length-2-i);
+    for(const idx of indices){
+      const b=c[idx],r=appendInterpolated(out,a,b,total,maxDistance); total+=r.used;
+      if(r.done) return {total,done:true,endpoint:out[out.length-1],incoming:bearingDeg(a.lat,a.lon,b.lat,b.lon)};
+      a=b;
+    }
+    const prev=fromStart?c[c.length-2]:c[1], endpoint=fromStart?c[c.length-1]:c[0];
+    return {total,done:false,endpoint,incoming:bearingDeg(prev.lat,prev.lon,endpoint.lat,endpoint.lon)};
+  }
+  function buildDirectionPath(feature, nearest, sign, maxDistance){
+    const c=feature.coords||[]; if(c.length<2) return {path:[],branches:[]};
+    const i=nearest.segmentIndex,start={lat:nearest.closestLat,lon:nearest.closestLon,d:0};
+    const out=[start],branches=[]; let total=0,current=feature,fromStart=sign>0,endpoint=null,incoming=null;
+    if(sign>0){
+      let a=start;
+      for(let idx=i+1;idx<c.length;idx++){ const r=appendInterpolated(out,a,c[idx],total,maxDistance); total+=r.used; if(r.done)return {path:out,branches}; incoming=bearingDeg(a.lat,a.lon,c[idx].lat,c[idx].lon); a=c[idx]; }
+      endpoint=c[c.length-1];
+    }else{
+      let a=start;
+      for(let idx=i;idx>=0;idx--){ const r=appendInterpolated(out,a,c[idx],total,maxDistance); total+=r.used; if(r.done)return {path:out,branches}; incoming=bearingDeg(a.lat,a.lon,c[idx].lat,c[idx].lon); a=c[idx]; }
+      endpoint=c[0];
+    }
+    const visited=new Set([targetKey(explore.group,feature)]);
+    while(total<maxDistance-0.01&&endpoint&&incoming!=null){
+      const candidates=endpointCandidates(explore.group,current,endpoint,incoming,visited);
+      if(!candidates.length) break;
+      if(candidates.length>1){
+        branches.push({d:total,point:endpoint,candidates:candidates.slice(0,6)});
+      }
+      const chosen=candidates[0];
+      if(chosen.gap>0.2){ const r=appendInterpolated(out,endpoint,chosen.atStart?chosen.feature.coords[0]:chosen.feature.coords[chosen.feature.coords.length-1],total,maxDistance); total+=r.used; if(r.done)break; }
+      current=chosen.feature; visited.add(targetKey(explore.group,current));
+      const r=appendFeatureDirection(out,current,chosen.atStart,total,maxDistance); total=r.total; endpoint=r.endpoint; incoming=r.incoming;
+      if(r.done) break;
+    }
+    return {path:out,branches};
   }
   function summarizeDirections(path){
     if(path.length<2) return 'Kohde päättyy tähän.';
@@ -4103,7 +4149,7 @@ if('serviceWorker' in navigator){
           const d=a.d+haversine(a.lat,a.lon,x.lat,x.lon);
           const key=normalized(other)+':'+Math.round(x.lat*10000)+':'+Math.round(x.lon*10000);
           if(found.some(v=>v.key===key))continue;
-          found.push({key,d,name:mdFeatureName(other)||'nimetön reitti'});
+          found.push({key,d,name:mdFeatureName(other)||'nimetön reitti',point:{lat:x.lat,lon:x.lon},feature:other,group:(mdState.roads||[]).includes(other)?'roads':((mdState.routeRelations||[]).includes(other)?'routeRelations':'gpx')});
         }
       }
     }
@@ -4137,24 +4183,32 @@ if('serviceWorker' in navigator){
   const panel=document.createElement('div');
   panel.className='full-view'; panel.id='mdExploreRoutePanel'; panel.style.display='none';
   panel.setAttribute('role','region'); panel.setAttribute('aria-label','Tutki kulkua');
-  panel.innerHTML='<div class="view-inner"><div class="view-header"><button class="btn btn-yellow back-btn" type="button" data-explore-back>Takaisin</button><span class="view-title" id="mdExploreTitle">Tutki reittiä</span></div><div class="info-box" id="mdExploreRouteName"></div><div class="field"><label for="mdExploreDistance">Tarkastelumatka</label><select id="mdExploreDistance"><option value="200">200 m</option><option value="500" selected>500 m</option><option value="1000">1 km</option><option value="2000">2 km</option><option value="5000">5 km</option></select></div><div class="btn-row"><button class="btn btn-blue" id="mdExploreDirBack">Suunta 1</button><button class="btn btn-blue" id="mdExploreDirForward">Suunta 2</button></div><div class="info-box" id="mdExploreSummary" role="status" aria-live="polite">Valitse suunta.</div></div>';
+  panel.innerHTML='<div class="view-inner"><div class="view-header"><button class="btn btn-yellow back-btn" type="button" data-explore-back>Takaisin</button><span class="view-title" id="mdExploreTitle">Tutki reittiä</span></div><div class="info-box" id="mdExploreRouteName"></div><div class="field"><label for="mdExploreDistance">Tarkastelumatka</label><select id="mdExploreDistance"><option value="200">200 m</option><option value="500" selected>500 m</option><option value="1000">1 km</option><option value="2000">2 km</option><option value="5000">5 km</option></select></div><div class="btn-row"><button class="btn btn-blue" id="mdExploreDirBack">Suunta 1</button><button class="btn btn-blue" id="mdExploreDirForward">Suunta 2</button></div><div class="info-box" id="mdExploreSummary" role="status" aria-live="polite">Valitse suunta.</div><div id="mdExploreBranches" class="controls" aria-label="Haarautumiset"></div><div id="mdExploreCrossRoutes" class="controls" aria-label="Risteävät reitit"></div></div>';
   document.getElementById('panel-map').appendChild(panel);
-  panel.querySelector('[data-explore-back]').addEventListener('click',()=>{panel.style.display='none';});
+  const exploreHistory=[];
+  panel.querySelector('[data-explore-back]').addEventListener('click',()=>{
+    const prev=exploreHistory.pop();
+    if(prev){ explore=prev; document.getElementById('mdExploreRouteName').textContent=mdFeatureName(explore.feature)||(explore.group==='waters'?'Vesistö':'Reitti'); updateDirectionButtons(); renderExplore(); }
+    else panel.style.display='none';
+  });
   let explore={group:null,feature:null,nearest:null,sign:1};
 
   function updateDirectionButtons(){
     const f=explore.feature,n=explore.nearest;
     if(!f||!n)return;
-    const p1=buildDirectionPath(f,n,-1,40),p2=buildDirectionPath(f,n,1,40);
+    const p1=buildDirectionPath(f,n,-1,40).path,p2=buildDirectionPath(f,n,1,40).path;
     const d1=p1.length>1?cardinal8(bearingDeg(p1[0].lat,p1[0].lon,p1[p1.length-1].lat,p1[p1.length-1].lon)):'päättyy';
     const d2=p2.length>1?cardinal8(bearingDeg(p2[0].lat,p2[0].lon,p2[p2.length-1].lat,p2[p2.length-1].lon)):'päättyy';
     document.getElementById('mdExploreDirBack').textContent='Suunta 1: '+d1;
     document.getElementById('mdExploreDirForward').textContent='Suunta 2: '+d2;
   }
+  function addExploreChoice(container,text,handler){
+    const b=document.createElement('button'); b.className='btn btn-blue'; b.textContent=text; b.addEventListener('click',handler); container.appendChild(b);
+  }
   function renderExplore(){
     if(!explore.feature||!explore.nearest)return;
     const distance=Number(document.getElementById('mdExploreDistance').value)||500;
-    const path=buildDirectionPath(explore.feature,explore.nearest,explore.sign,distance);
+    const built=buildDirectionPath(explore.feature,explore.nearest,explore.sign,distance),path=built.path;
     let text=summarizeDirections(path);
     const crossings=routeCrossings(explore.feature,path);
     if(crossings.length) text+=' Risteykset: '+crossings.map(x=>compactDistance(x.d)+' '+x.name).join(', ')+'.';
@@ -4162,12 +4216,28 @@ if('serviceWorker' in navigator){
     if(nearby.length) text+=' Lähellä: '+nearby.map(x=>compactDistance(x.d)+' '+x.name).join(', ')+'.';
     if(!crossings.length&&!nearby.length) text+=' Ei risteyksiä tai valittuja lähikohteita.';
     document.getElementById('mdExploreSummary').textContent=text;
+    const branchBox=document.getElementById('mdExploreBranches'),crossBox=document.getElementById('mdExploreCrossRoutes');
+    branchBox.innerHTML=''; crossBox.innerHTML='';
+    for(const branch of built.branches){
+      for(const c of branch.candidates){
+        addExploreChoice(branchBox,'Haarassa '+compactDistance(branch.d)+': '+c.name+', '+cardinal8(c.bearing),()=>{
+          const nn=projectFromNearest(c.feature,branch.point.lat,branch.point.lon); if(!nn)return;
+          explore={group:explore.group,feature:c.feature,nearest:nn,sign:c.atStart?1:-1}; updateDirectionButtons(); renderExplore();
+        });
+      }
+    }
+    const shown=new Set();
+    for(const x of crossings){
+      const k=targetKey(x.group,x.feature); if(shown.has(k))continue; shown.add(k);
+      addExploreChoice(crossBox,'Tutki risteävää: '+x.name+', '+compactDistance(x.d),()=>openExplore(x.group,x.feature,x.point));
+    }
   }
-  function openExplore(group,feature){
-    const lat=mdState.currentLat,lon=mdState.currentLon;
+  function openExplore(group,feature,startPoint){
+    const lat=startPoint&&startPoint.lat!=null?startPoint.lat:mdState.currentLat,lon=startPoint&&startPoint.lon!=null?startPoint.lon:mdState.currentLon;
     if(lat==null||lon==null){announce('Aloita GPS-seuranta tai simulointi ensin.');return;}
     const nearest=projectFromNearest(feature,lat,lon);
     if(!nearest){announce('Kohteen geometriaa ei voitu tutkia.');return;}
+    if(panel.style.display!=='none'&&explore.feature) exploreHistory.push({...explore});
     explore={group,feature,nearest,sign:1};
     const water=group==='waters';
     document.getElementById('mdExploreTitle').textContent=water?'Tutki kulkua':'Tutki reittiä';
