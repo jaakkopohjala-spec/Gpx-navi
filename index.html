@@ -2584,14 +2584,57 @@ function mdHandlePosition(pos) {
 
 
 /* === Uuden perusnäkymän lisälogiikka: alisivut, GPX, pysäköinti, simulointi === */
+let mdInertStack = [];
+let mdFullViewOpener = null;
+
+// Piilottaa ruudunlukijoilta kaiken, mikä on visuaalisesti peitossa avatun
+// full-view-paneelin alla. Kävelee DOM-puuta elementistä body:hyn ja merkitsee
+// jokaisen sisarelementin (jotka eivät jo ole display:none) inert+aria-hidden.
+// NVDA/TalkBack lukevat DOM-järjestystä eivätkä huomioi CSS-sijoittelua, joten
+// pelkkä position:fixed-peittokerros ei riitä piilottamaan taustaa niiltä.
+function mdApplyBackgroundInert(visibleEl) {
+  mdInertStack = [];
+  let node = visibleEl;
+  while (node && node !== document.body) {
+    const parent = node.parentElement;
+    if (parent) {
+      for (const sib of parent.children) {
+        if (sib === node) continue;
+        if (sib.hasAttribute('inert') || sib.getAttribute('aria-hidden') === 'true') continue;
+        if (window.getComputedStyle(sib).display === 'none') continue;
+        sib.setAttribute('inert', '');
+        sib.setAttribute('aria-hidden', 'true');
+        mdInertStack.push(sib);
+      }
+    }
+    node = parent;
+  }
+}
+function mdRemoveBackgroundInert() {
+  mdInertStack.forEach(el => { el.removeAttribute('inert'); el.removeAttribute('aria-hidden'); });
+  mdInertStack = [];
+}
 function mdOpenFullView(el) {
   if (!el) return;
+  mdFullViewOpener = document.activeElement;
   el.style.display = '';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-modal', 'true');
   const back = el.querySelector('[data-back]');
-  if (back) setTimeout(() => back.focus(), 30);
+  setTimeout(() => {
+    if (back) back.focus();
+    // Tausta piilotetaan vasta fokuksen siirron jälkeen, ettei fokuksessa
+    // olevaa elementtiä merkitä aria-hidden-tilaan kesken siirtymän.
+    mdApplyBackgroundInert(el);
+  }, 30);
 }
 function mdCloseFullViews() {
-  document.querySelectorAll('.full-view').forEach(v => v.style.display = 'none');
+  document.querySelectorAll('.full-view').forEach(v => { v.style.display = 'none'; v.removeAttribute('aria-modal'); });
+  mdRemoveBackgroundInert();
+  if (mdFullViewOpener && typeof mdFullViewOpener.focus === 'function') {
+    mdFullViewOpener.focus();
+  }
+  mdFullViewOpener = null;
 }
 document.querySelectorAll('[data-back]').forEach(btn => btn.addEventListener('click', mdCloseFullViews));
 if (document.getElementById('mdNotificationsBtn')) {
@@ -4189,7 +4232,13 @@ if('serviceWorker' in navigator){
   panel.querySelector('[data-explore-back]').addEventListener('click',()=>{
     const prev=exploreHistory.pop();
     if(prev){ explore=prev; document.getElementById('mdExploreRouteName').textContent=mdFeatureName(explore.feature)||(explore.group==='waters'?'Vesistö':'Reitti'); updateDirectionButtons(); renderExplore(); }
-    else panel.style.display='none';
+    else {
+      panel.style.display = 'none';
+      panel.removeAttribute('aria-modal');
+      mdRemoveBackgroundInert();
+      if (mdFullViewOpener && typeof mdFullViewOpener.focus === 'function') mdFullViewOpener.focus();
+      mdFullViewOpener = null;
+    }
   });
   let explore={group:null,feature:null,nearest:null,sign:1};
 
@@ -4243,7 +4292,14 @@ if('serviceWorker' in navigator){
     document.getElementById('mdExploreTitle').textContent=water?'Tutki kulkua':'Tutki reittiä';
     panel.setAttribute('aria-label',water?'Tutki vesistön kulkua':'Tutki reittiä');
     document.getElementById('mdExploreRouteName').textContent=mdFeatureName(feature)||(water?'Vesistö':'Reitti');
-    updateDirectionButtons(); renderExplore(); panel.style.display=''; panel.querySelector('[data-explore-back]').focus();
+    updateDirectionButtons(); renderExplore();
+    const wasHidden = panel.style.display === 'none';
+    panel.style.display = '';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+    if (wasHidden) mdFullViewOpener = document.activeElement;
+    panel.querySelector('[data-explore-back]').focus();
+    mdApplyBackgroundInert(panel);
   }
   document.getElementById('mdExploreDirBack').addEventListener('click',()=>{explore.sign=-1;renderExplore();});
   document.getElementById('mdExploreDirForward').addEventListener('click',()=>{explore.sign=1;renderExplore();});
