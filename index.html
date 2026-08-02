@@ -2584,16 +2584,19 @@ function mdHandlePosition(pos) {
 
 
 /* === Uuden perusnäkymän lisälogiikka: alisivut, GPX, pysäköinti, simulointi === */
-let mdInertStack = [];
-let mdFullViewOpener = null;
+// Pino, jossa jokainen avattu full-view-näkymä saa oman "kerroksensa":
+// { el, hidden: [piilotetut taustaelementit], opener: avannut elementti }.
+// Pino korjaa tilanteen, jossa yksi full-view avataan toisen full-view'n
+// PÄÄLLE (esim. Tutki-toiminto avataan Lähimmät-listan sisältä valitsemalla
+// risteävä reitti/vesistö): ilman pinoa taustan piilotus laskettiin vain
+// kerran globaaliin muuttujaan, jolloin sisäkkäinen avaus korvasi edellisen
+// kerroksen tiedon. Seurauksena taustaelementit (yläpalkki, peruspaikan
+// painikkeet) jäivät pysyvästi inert+aria-hidden-tilaan, kun sisin näkymä
+// suljettiin — ja peruspaikka näytti sen jälkeen ruudunlukijalle mykältä.
+let mdViewStack = [];
 
-// Piilottaa ruudunlukijoilta kaiken, mikä on visuaalisesti peitossa avatun
-// full-view-paneelin alla. Kävelee DOM-puuta elementistä body:hyn ja merkitsee
-// jokaisen sisarelementin (jotka eivät jo ole display:none) inert+aria-hidden.
-// NVDA/TalkBack lukevat DOM-järjestystä eivätkä huomioi CSS-sijoittelua, joten
-// pelkkä position:fixed-peittokerros ei riitä piilottamaan taustaa niiltä.
-function mdApplyBackgroundInert(visibleEl) {
-  mdInertStack = [];
+function mdHideBackgroundFor(visibleEl) {
+  const hidden = [];
   let node = visibleEl;
   while (node && node !== document.body) {
     const parent = node.parentElement;
@@ -2604,37 +2607,49 @@ function mdApplyBackgroundInert(visibleEl) {
         if (window.getComputedStyle(sib).display === 'none') continue;
         sib.setAttribute('inert', '');
         sib.setAttribute('aria-hidden', 'true');
-        mdInertStack.push(sib);
+        hidden.push(sib);
       }
     }
     node = parent;
   }
+  return hidden;
 }
-function mdRemoveBackgroundInert() {
-  mdInertStack.forEach(el => { el.removeAttribute('inert'); el.removeAttribute('aria-hidden'); });
-  mdInertStack = [];
-}
+
 function mdOpenFullView(el) {
   if (!el) return;
-  mdFullViewOpener = document.activeElement;
+  // Jos tämä näkymä on jo pinon päällimmäisenä, ei avata sitä uudestaan
+  // (estää kaksinkertaisen kerroksen esim. peräkkäisillä klikkauksilla).
+  if (mdViewStack.length && mdViewStack[mdViewStack.length - 1].el === el) return;
+  const opener = document.activeElement;
   el.style.display = '';
   el.setAttribute('role', 'dialog');
   el.setAttribute('aria-modal', 'true');
-  const back = el.querySelector('[data-back]');
+  const back = el.querySelector('[data-back], [data-explore-back]');
   setTimeout(() => {
     if (back) back.focus();
     // Tausta piilotetaan vasta fokuksen siirron jälkeen, ettei fokuksessa
     // olevaa elementtiä merkitä aria-hidden-tilaan kesken siirtymän.
-    mdApplyBackgroundInert(el);
+    const hidden = mdHideBackgroundFor(el);
+    mdViewStack.push({ el, hidden, opener });
   }, 30);
 }
+
+// Sulkee pinon päällimmäisen näkymän: palauttaa juuri sen kerroksen
+// piilottamat taustaelementit ja siirtää fokuksen takaisin avanneeseen
+// elementtiin. Jos alla on vielä toinen full-view (sisäkkäinen tilanne),
+// se jää edelleen näkyviin ja sen oma taustapiilotus säilyy koskemattomana.
 function mdCloseFullViews() {
-  document.querySelectorAll('.full-view').forEach(v => { v.style.display = 'none'; v.removeAttribute('aria-modal'); });
-  mdRemoveBackgroundInert();
-  if (mdFullViewOpener && typeof mdFullViewOpener.focus === 'function') {
-    mdFullViewOpener.focus();
+  const frame = mdViewStack.pop();
+  if (!frame) {
+    document.querySelectorAll('.full-view').forEach(v => { v.style.display = 'none'; v.removeAttribute('aria-modal'); });
+    return;
   }
-  mdFullViewOpener = null;
+  frame.el.style.display = 'none';
+  frame.el.removeAttribute('aria-modal');
+  frame.hidden.forEach(h => { h.removeAttribute('inert'); h.removeAttribute('aria-hidden'); });
+  if (frame.opener && typeof frame.opener.focus === 'function' && document.contains(frame.opener)) {
+    frame.opener.focus();
+  }
 }
 document.querySelectorAll('[data-back]').forEach(btn => btn.addEventListener('click', mdCloseFullViews));
 if (document.getElementById('mdNotificationsBtn')) {
@@ -3533,6 +3548,13 @@ mdGpsToggle.addEventListener('click', async () => {
   mdRenderNearestGroup = function() {
     const cfg = mdGroupConfig(mdState.nearestGroupKey);
     if (!cfg) return;
+    // Säilytetään fokus listan uudelleenpiirron yli. Esim. "Seuraa"-painikkeen
+    // painaminen poistaa ja rakentaa koko listan uudelleen, jolloin juuri
+    // painettu, fokusoitu painike katoaa DOM:ista. Selain siirtää tällöin
+    // fokuksen huomaamatta <body>-elementtiin, jolloin ruudunlukija vaikenee
+    // eikä ilmoita mitään, ennen kuin käyttäjä alkaa selata sivua uudelleen.
+    const focusedRow = document.activeElement && document.activeElement.closest && document.activeElement.closest('.nearest-item');
+    const focusedKey = focusedRow ? focusedRow.dataset.targetKey : null;
     mdNearestPanel.style.display = '';
     mdNearestTitle.textContent = cfg.title;
     [...mdNearestList.querySelectorAll('.nearest-item')].forEach(el => el.remove());
@@ -3544,6 +3566,7 @@ mdGpsToggle.addEventListener('click', async () => {
     const list = all.slice(0, mdState.nearestGroupLimit || 20);
     if (!list.length) { mdNearestEmpty.textContent = 'Ei kohteita.'; mdNearestEmpty.style.display = ''; return; }
     mdNearestEmpty.style.display = 'none';
+    let rowToFocus = null;
     for (const item of list) {
       const featureName = mdFeatureName(item.feature);
       const distText = item.distance >= 1000 ? (item.distance/1000).toFixed(1) + ' km' : Math.round(item.distance) + ' m';
@@ -3556,8 +3579,10 @@ mdGpsToggle.addEventListener('click', async () => {
       row.appendChild(nameEl); row.appendChild(distEl);
       mdAttachActionMenu(row, mdState.nearestGroupKey, item.feature, mdRenderNearestGroup);
       mdNearestList.appendChild(row);
+      if (focusedKey && row.dataset.targetKey === focusedKey) rowToFocus = row;
     }
     if (all.length > list.length) { mdNearestMoreBtn.style.display = ''; mdNearestMoreBtn.textContent = 'Näytä lisää'; }
+    if (rowToFocus) rowToFocus.focus();
   };
 
   mdRenderOwnPlaces = function() {
@@ -4233,11 +4258,7 @@ if('serviceWorker' in navigator){
     const prev=exploreHistory.pop();
     if(prev){ explore=prev; document.getElementById('mdExploreRouteName').textContent=mdFeatureName(explore.feature)||(explore.group==='waters'?'Vesistö':'Reitti'); updateDirectionButtons(); renderExplore(); }
     else {
-      panel.style.display = 'none';
-      panel.removeAttribute('aria-modal');
-      mdRemoveBackgroundInert();
-      if (mdFullViewOpener && typeof mdFullViewOpener.focus === 'function') mdFullViewOpener.focus();
-      mdFullViewOpener = null;
+      mdCloseFullViews();
     }
   });
   let explore={group:null,feature:null,nearest:null,sign:1};
@@ -4293,13 +4314,9 @@ if('serviceWorker' in navigator){
     panel.setAttribute('aria-label',water?'Tutki vesistön kulkua':'Tutki reittiä');
     document.getElementById('mdExploreRouteName').textContent=mdFeatureName(feature)||(water?'Vesistö':'Reitti');
     updateDirectionButtons(); renderExplore();
-    const wasHidden = panel.style.display === 'none';
     panel.style.display = '';
-    panel.setAttribute('role', 'dialog');
-    panel.setAttribute('aria-modal', 'true');
-    if (wasHidden) mdFullViewOpener = document.activeElement;
+    mdOpenFullView(panel);
     panel.querySelector('[data-explore-back]').focus();
-    mdApplyBackgroundInert(panel);
   }
   document.getElementById('mdExploreDirBack').addEventListener('click',()=>{explore.sign=-1;renderExplore();});
   document.getElementById('mdExploreDirForward').addEventListener('click',()=>{explore.sign=1;renderExplore();});
