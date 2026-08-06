@@ -2602,7 +2602,7 @@ function mdHideBackgroundFor(visibleEl) {
     const parent = node.parentElement;
     if (parent) {
       for (const sib of parent.children) {
-        if (sib === node) continue;
+        if (sib === node || sib.id === 'srAnnounce') continue;
         if (sib.hasAttribute('inert') || sib.getAttribute('aria-hidden') === 'true') continue;
         if (window.getComputedStyle(sib).display === 'none') continue;
         sib.setAttribute('inert', '');
@@ -3380,6 +3380,7 @@ mdGpsToggle.addEventListener('click', async () => {
     if (key === 'waters') return mdState.waters || [];
     if (key === 'outdoor') return mdState.outdoor || [];
     if (key === 'parking') return mdState.parking || [];
+    if (key === 'transit') return mdState.transit || [];
     if (key === 'structures') return mdState.structures || [];
     if (key === 'landtypes') return mdState.landtypes || [];
     if (key === 'barriers') return mdState.barriers || [];
@@ -3394,6 +3395,7 @@ mdGpsToggle.addEventListener('click', async () => {
     else if (key === 'waters') mdState.waters = list;
     else if (key === 'outdoor') mdState.outdoor = list;
     else if (key === 'parking') mdState.parking = list;
+    else if (key === 'transit') mdState.transit = list;
     else if (key === 'structures') mdState.structures = list;
     else if (key === 'landtypes') mdState.landtypes = list;
     else if (key === 'barriers') mdState.barriers = list;
@@ -3401,7 +3403,7 @@ mdGpsToggle.addEventListener('click', async () => {
     else if (key === 'routeRelations') mdState.routeRelations = list;
   }
   function mdTitleForGroup(key){
-    const titles = { ownPlaces:'Omat paikat', gpx:'GPX', roads:'Tiet ja polut', waters:'Vesistöt', outdoor:'Retkeilykohteet', parking:'Pysäköinti', structures:'Rakennukset ja rakenteet', landtypes:'Maastotyypit', barriers:'Esteet ja rajoitukset', elevations:'Korkeustagit', routeRelations:'Reittirelaatiot' };
+    const titles = { ownPlaces:'Omat paikat', gpx:'GPX', roads:'Tiet ja polut', waters:'Vesistöt', outdoor:'Retkeilykohteet', parking:'Pysäköinti', transit:'Joukkoliikenne', structures:'Rakennukset ja rakenteet', landtypes:'Maastotyypit', barriers:'Esteet ja rajoitukset', elevations:'Korkeustagit', routeRelations:'Reittirelaatiot' };
     return titles[key] || key;
   }
   function mdDisplayNameForTarget(key, feature){
@@ -3572,7 +3574,7 @@ mdGpsToggle.addEventListener('click', async () => {
       const distText = item.distance >= 1000 ? (item.distance/1000).toFixed(1) + ' km' : Math.round(item.distance) + ' m';
       const dir = mdDirectionFromTo(lat, lon, item.closestLat, item.closestLon);
       const row = document.createElement('div');
-      row.className = 'nearest-item'; row.setAttribute('role','listitem'); row.setAttribute('tabindex','0');
+      row.className = 'nearest-item'; row.setAttribute('role','button'); row.setAttribute('tabindex','0'); row.setAttribute('aria-haspopup','true');
       row.setAttribute('aria-label', featureName + ', ' + distText + ' ' + dir + '. Avaa toiminnot kaksoisnapauttamalla.');
       const nameEl = document.createElement('div'); nameEl.className = 'nearest-item-name'; nameEl.textContent = featureName; nameEl.setAttribute('aria-hidden','true');
       const distEl = document.createElement('div'); distEl.className = 'nearest-item-dist'; distEl.textContent = distText + ' ' + dir; distEl.setAttribute('aria-hidden','true');
@@ -3594,7 +3596,7 @@ mdGpsToggle.addEventListener('click', async () => {
     });
     mdOwnPlacesEmpty.style.display = list.length ? 'none' : '';
     for (const p of list) {
-      const item = document.createElement('div'); item.className = 'place-item'; item.setAttribute('role','listitem'); item.tabIndex = 0;
+      const item = document.createElement('div'); item.className = 'place-item'; item.setAttribute('role','button'); item.tabIndex = 0; item.setAttribute('aria-haspopup','true');
       const nameEl = document.createElement('div'); nameEl.className='place-item-name'; nameEl.textContent=p.name; nameEl.setAttribute('aria-hidden','true');
       const distEl = document.createElement('div'); distEl.className='place-item-dist';
       let label;
@@ -3614,7 +3616,7 @@ mdGpsToggle.addEventListener('click', async () => {
     if (empty) empty.style.display = (mdState.gpxRoutes || []).length ? 'none' : '';
     const lat = mdState.currentLat, lon = mdState.currentLon;
     for (const r of (mdState.gpxRoutes || [])) {
-      const item = document.createElement('div'); item.className = 'place-item'; item.setAttribute('role','listitem'); item.tabIndex = 0;
+      const item = document.createElement('div'); item.className = 'place-item'; item.setAttribute('role','button'); item.tabIndex = 0; item.setAttribute('aria-haspopup','true');
       const n = document.createElement('div'); n.className = 'place-item-name'; n.textContent = r.name; n.setAttribute('aria-hidden','true');
       const d = document.createElement('div'); d.className = 'place-item-dist'; d.setAttribute('aria-hidden','true');
       let label = r.name + ', ' + ((r.coords || []).length) + ' pistettä';
@@ -3949,7 +3951,7 @@ if('serviceWorker' in navigator){
     const map = {
       ownPlaces:'ownPlaces', gpx:'gpxRoutes', roads:'roads', waters:'waters',
       outdoor:'outdoor', parking:'parking', structures:'structures', landtypes:'landtypes',
-      barriers:'barriers', elevations:'elevations', routeRelations:'routeRelations'
+      barriers:'barriers', elevations:'elevations', transit:'transit', routeRelations:'routeRelations'
     };
     return mdState[map[group]] || [];
   }
@@ -4404,6 +4406,228 @@ if('serviceWorker' in navigator){
     for(const key of Object.keys(mdState.crossingInside||{}))if(!active[key])delete mdState.crossingInside[key];
   };
 })();
+
+
+/* === 6.8.2026: NVDA-saavutettavuus, latausilmoitukset ja joukkoliikenne === */
+(function(){
+  'use strict';
+
+  // Varmistetaan myös dynaamisesti luotaville riveille painikerooli.
+  function fixInteractiveRow(el) {
+    if (!el || !el.matches || !el.matches('.nearest-item[tabindex], .place-item[tabindex]')) return;
+    el.setAttribute('role', 'button');
+    el.setAttribute('aria-haspopup', 'true');
+  }
+  document.querySelectorAll('.nearest-item[tabindex], .place-item[tabindex]').forEach(fixInteractiveRow);
+  const rowObserver = new MutationObserver(records => {
+    for (const rec of records) for (const node of rec.addedNodes) {
+      if (node.nodeType !== 1) continue;
+      fixInteractiveRow(node);
+      if (node.querySelectorAll) node.querySelectorAll('.nearest-item[tabindex], .place-item[tabindex]').forEach(fixInteractiveRow);
+    }
+  });
+  rowObserver.observe(document.body, {childList:true, subtree:true});
+
+  // Taustan piilotus ei saa piilottaa ruudunlukijan live-aluetta.
+  const oldHideBackground = mdHideBackgroundFor;
+  mdHideBackgroundFor = function(visibleEl) {
+    const hidden = oldHideBackground(visibleEl);
+    const live = document.getElementById('srAnnounce');
+    if (live) {
+      live.removeAttribute('inert');
+      live.removeAttribute('aria-hidden');
+      const i = hidden.indexOf(live);
+      if (i >= 0) hidden.splice(i, 1);
+    }
+    return hidden;
+  };
+
+  // Lisätään joukkoliikenteen käyttöliittymäkohdat.
+  const categoryGrid = document.querySelector('.category-grid');
+  if (categoryGrid && !document.getElementById('mdShowTransitBtn')) {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-blue'; btn.id = 'mdShowTransitBtn'; btn.textContent = 'Joukkoliikenne';
+    const parking = document.getElementById('mdShowParkingBtn');
+    categoryGrid.insertBefore(btn, parking ? parking.nextSibling : null);
+  }
+  const loadGroup = document.querySelector('#mdLoadPanel [aria-label="Ladattavat aineistot"]');
+  if (loadGroup && !document.getElementById('mdLoadTransitCb')) {
+    const label = document.createElement('label'); label.className = 'check-row';
+    label.innerHTML = '<input type="checkbox" id="mdLoadTransitCb" checked><span>Joukkoliikenne</span>';
+    const parking = document.getElementById('mdLoadParkingCb');
+    loadGroup.insertBefore(label, parking && parking.closest('label') ? parking.closest('label').nextSibling : null);
+  }
+  const notifyGroup = document.querySelector('#mdNotificationsPanel [aria-label="Ilmoitettavat kategoriat"]');
+  if (notifyGroup && !document.getElementById('mdTransitCb')) {
+    const label = document.createElement('label'); label.className = 'check-row';
+    label.innerHTML = '<input type="checkbox" id="mdTransitCb"><span>Joukkoliikenne</span>';
+    const parking = document.getElementById('mdParkingCb');
+    notifyGroup.insertBefore(label, parking && parking.closest('label') ? parking.closest('label').nextSibling : null);
+  }
+  const stats = document.querySelector('#mdDataInfoContent .stats');
+  if (stats && !document.getElementById('mdTransitCount')) {
+    const stat = document.createElement('div'); stat.className = 'stat';
+    stat.innerHTML = '<span class="stat-label">Joukkoliikenne</span><span class="stat-value" id="mdTransitCount">0</span>';
+    const pc = document.getElementById('mdParkingCount');
+    stats.insertBefore(stat, pc && pc.closest('.stat') ? pc.closest('.stat').nextSibling : null);
+  }
+
+  mdState.transit = Array.isArray(mdState.transit) ? mdState.transit : [];
+  try {
+    const stored = JSON.parse(localStorage.getItem(MD_STORAGE_KEY) || '{}');
+    if (Array.isArray(stored.transit)) mdState.transit = stored.transit;
+  } catch(e) {}
+
+  function transitTypeText(tags) {
+    if (tags.highway === 'bus_stop') return 'bussipysäkki';
+    if (tags.amenity === 'bus_station') return 'linja-autoasema';
+    if (tags.amenity === 'ferry_terminal') return 'lauttaterminaali';
+    if (tags.railway === 'tram_stop') return 'raitiovaunupysäkki';
+    if (tags.railway === 'station') return 'rautatieasema';
+    if (tags.railway === 'halt') return 'junapysäkki';
+    if (tags.railway === 'subway_entrance') return 'metroaseman sisäänkäynti';
+    if (tags.public_transport === 'station') return 'joukkoliikenneasema';
+    if (tags.public_transport === 'stop_position') return 'pysähtymispaikka';
+    if (tags.public_transport === 'platform') return 'pysäkki tai laituri';
+    return 'joukkoliikennekohde';
+  }
+  function isTransit(tags) {
+    return tags && (tags.highway === 'bus_stop' || tags.public_transport ||
+      ['bus_station','ferry_terminal'].includes(tags.amenity) ||
+      ['tram_stop','station','halt','subway_entrance'].includes(tags.railway));
+  }
+
+  const oldQuery = mdOverpassQuery;
+  mdOverpassQuery = function(lat, lon) {
+    let q = oldQuery(lat, lon);
+    if (!document.getElementById('mdLoadTransitCb') || document.getElementById('mdLoadTransitCb').checked) {
+      const r = typeof mdRadiusMeters === 'function' ? mdRadiusMeters() : MD_RADIUS_M;
+      const extra = `\n  node(around:${r},${lat},${lon})["highway"="bus_stop"];\n  node(around:${r},${lat},${lon})["public_transport"];\n  way(around:${r},${lat},${lon})["public_transport"];\n  relation(around:${r},${lat},${lon})["public_transport"];\n  node(around:${r},${lat},${lon})["amenity"~"^(bus_station|ferry_terminal)$"];\n  way(around:${r},${lat},${lon})["amenity"~"^(bus_station|ferry_terminal)$"];\n  relation(around:${r},${lat},${lon})["amenity"~"^(bus_station|ferry_terminal)$"];\n  node(around:${r},${lat},${lon})["railway"~"^(tram_stop|station|halt|subway_entrance)$"];\n  way(around:${r},${lat},${lon})["railway"~"^(station|halt)$"];\n  relation(around:${r},${lat},${lon})["railway"~"^(station|halt)$"];`;
+      q = q.replace(/\n\);\n\s*out body geom;/, extra + '\n);\nout body geom;');
+    }
+    return q;
+  };
+
+  const oldParse = mdParseOverpass;
+  mdParseOverpass = function(json) {
+    const parsed = oldParse(json);
+    const transit = [];
+    const elements = Array.isArray(json && json.elements) ? json.elements : [];
+    for (const el of elements) {
+      const tags = el.tags || {};
+      if (!isTransit(tags)) continue;
+      const baseCoords = mdElementCoords(el);
+      const relParts = el.type === 'relation' ? mdRelationMemberCoords(el) : [];
+      const parts = relParts.length ? relParts : [{coords:baseCoords, suffix:''}];
+      for (const part of parts) if (part.coords && part.coords.length) {
+        mdAddFeature(transit, el, tags, part.coords, 'transit', transitTypeText(tags), part.suffix || '');
+      }
+    }
+    parsed.transit = transit;
+    return parsed;
+  };
+
+  const oldMerge = mdMergeParsedData;
+  mdMergeParsedData = function(parsed, center) {
+    const result = oldMerge(parsed, center);
+    const merge = mdMergeFeatureLists(mdState.transit || [], parsed.transit || []);
+    mdState.transit = merge.list;
+    result.addedTransit = merge.added;
+    mdSaveStoredData();
+    mdUpdateCounts();
+    return result;
+  };
+
+  mdSaveStoredData = function() {
+    const data = {
+      roads:mdState.roads, waters:mdState.waters, outdoor:mdState.outdoor, parking:mdState.parking,
+      transit:mdState.transit, structures:mdState.structures, landtypes:mdState.landtypes,
+      barriers:mdState.barriers, elevations:mdState.elevations, routeRelations:mdState.routeRelations,
+      gpxRoutes:mdState.gpxRoutes, loadedAt:mdState.loadedAt, center:mdState.center,
+      centers:mdState.centers, ownPlaces:mdState.ownPlaces
+    };
+    try { localStorage.setItem(MD_STORAGE_KEY, JSON.stringify(data)); }
+    catch(e) { announce('Data ladattiin, mutta tallennus selaimeen epäonnistui.'); }
+  };
+
+  const oldCounts = mdUpdateCounts;
+  mdUpdateCounts = function() {
+    oldCounts();
+    const el = document.getElementById('mdTransitCount');
+    if (el) el.textContent = (mdState.transit || []).length;
+  };
+
+  const oldGroupConfig = mdGroupConfig;
+  mdGroupConfig = function(key) {
+    if (key === 'transit') return {title:'Joukkoliikenne', list:mdState.transit || [], cb:document.getElementById('mdTransitCb')};
+    return oldGroupConfig(key);
+  };
+  const transitBtn = document.getElementById('mdShowTransitBtn');
+  if (transitBtn) transitBtn.addEventListener('click', () => mdShowNearestGroup('transit'));
+
+  const oldCategoryAnnouncements = mdMaybeCategoryProximityAnnouncements;
+  mdMaybeCategoryProximityAnnouncements = function(lat, lon) {
+    oldCategoryAnnouncements(lat, lon);
+    const cb = document.getElementById('mdTransitCb');
+    if (cb && !cb.checked) return;
+    const nearest = mdNearestFeature(mdState.transit || [], lat, lon);
+    const activeKey = nearest && nearest.distance <= 15 ? 'transit:' + String(nearest.feature.id || mdFeatureName(nearest.feature)) : null;
+    for (const key of Object.keys(mdState.categoryInside || {})) {
+      if (key.startsWith('transit:') && key !== activeKey) delete mdState.categoryInside[key];
+    }
+    if (!activeKey || mdState.categoryInside[activeKey]) return;
+    const dir = mdDirectionFromTo(lat, lon, nearest.closestLat, nearest.closestLon);
+    mdSpeak(mdFeatureName(nearest.feature) + ' ' + Math.round(nearest.distance) + ' m ' + dir);
+    mdState.categoryInside[activeKey] = true;
+  };
+
+  mdExportData = function() {
+    const data = {version:4, source:'OpenStreetMap / Overpass', exportedAt:new Date().toISOString(),
+      loadedAt:mdState.loadedAt, center:mdState.center, centers:mdState.centers,
+      roads:mdState.roads, waters:mdState.waters, outdoor:mdState.outdoor, parking:mdState.parking,
+      transit:mdState.transit, structures:mdState.structures, landtypes:mdState.landtypes,
+      barriers:mdState.barriers, elevations:mdState.elevations, routeRelations:mdState.routeRelations,
+      ownPlaces:mdState.ownPlaces, gpxRoutes:mdState.gpxRoutes};
+    const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob); const a=document.createElement('a');
+    a.href=url; a.download='kartta_ja_paikat_'+new Date().toISOString().slice(0,19).replace(/:/g,'-')+'.json';
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),5000);
+    announce('Data viety.');
+  };
+
+  mdImportDataFromObject = function(data) {
+    if (!data || (!Array.isArray(data.roads) && !Array.isArray(data.waters))) throw new Error('Tiedosto ei sisällä kelvollista karttadataa.');
+    const merged = mdMergeParsedData({roads:data.roads||[], waters:data.waters||[], outdoor:data.outdoor||[], parking:data.parking||[], transit:data.transit||[], structures:data.structures||[], landtypes:data.landtypes||[], barriers:data.barriers||[], elevations:data.elevations||[], routeRelations:data.routeRelations||[]}, data.center||null);
+    if (Array.isArray(data.ownPlaces)) mdState.ownPlaces = data.ownPlaces;
+    if (Array.isArray(data.gpxRoutes)) mdState.gpxRoutes = data.gpxRoutes;
+    mdSaveStoredData(); mdUpdateCounts();
+    if (typeof mdRenderOwnPlaces === 'function') mdRenderOwnPlaces();
+    if (typeof mdRenderGpxList === 'function') mdRenderGpxList();
+    announce('Data tuotu. Uusia kohteita ' + ((merged.addedRoads||0)+(merged.addedWaters||0)+(merged.addedOutdoor||0)+(merged.addedParking||0)+(merged.addedTransit||0)+(merged.addedStructures||0)+(merged.addedLandtypes||0)+(merged.addedBarriers||0)+(merged.addedElevations||0)+(merged.addedRouteRelations||0)) + '.');
+  };
+
+  const oldClear = mdClearData;
+  mdClearData = function() { oldClear(); mdState.transit=[]; mdSaveStoredData(); mdUpdateCounts(); };
+
+  // Latauksen onnistumis- ja virheilmoitukset varmasti live-alueelle.
+  const oldFetch = mdFetchAndMergeAt;
+  mdFetchAndMergeAt = async function(lat, lon, sourceText) {
+    try {
+      const before = (mdState.transit || []).length;
+      const result = await oldFetch(lat, lon, sourceText);
+      const addedTransit = Math.max(0, (mdState.transit || []).length - before);
+      const msg = addedTransit ? 'Kartta lisätty. Joukkoliikennekohteita lisättiin ' + addedTransit + '.' : 'Kartta lisätty.';
+      announce(msg);
+      return result;
+    } catch(e) {
+      announce('Kartan lataus epäonnistui. ' + (e && e.message ? e.message : 'Tuntematon virhe.'));
+      throw e;
+    }
+  };
+
+  mdUpdateCounts();
+})();
+
 </script>
 
 </body>
