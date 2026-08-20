@@ -552,7 +552,7 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
 
   <div class="full-view" id="mdLoadPanel" style="display:none" role="region" aria-label="Karttatoiminnot">
     <div class="view-inner">
-      <div class="view-header"><button class="btn btn-yellow back-btn" type="button" data-back>Takaisin</button><span class="view-title">Karttatoiminnot</span></div>
+      <div class="view-header"><button class="btn btn-yellow back-btn" type="button" data-back>Takaisin</button><span class="view-title">Karttatoiminnot</span></div><div id="mdLoadAnnounce" class="sr-only" role="status" aria-live="assertive" aria-atomic="true"></div>
       <div class="field"><label for="mdRadiusInput">Lataussäde kilometreinä</label><input type="number" id="mdRadiusInput" value="2" min="0.2" max="10" step="0.1"><span class="hint">Oletus 2 km. Suuri säde voi hidastaa hakua.</span></div>
       <div class="check-group" role="group" aria-label="Ladattavat aineistot">
         <label class="check-row"><input type="checkbox" id="mdLoadRoadsCb" checked><span>Tiet ja polut</span></label>
@@ -1979,7 +1979,7 @@ async function mdLoadFromCurrentPosition() {
     await mdFetchAndMergeAt(lat, lon, 'nykysijainti');
   } catch(err) {
     mdSetBanner('Kartta ja paikkojen lataus epäonnistui: ' + err.message, 'error');
-    announce('Kartta ja paikkojen lataus epäonnistui.');
+    if (!String(err && err.message || '').includes('Overpass')) announce('Kartta ja paikkojen lataus epäonnistui. ' + (err && err.message ? err.message : ''));
   }
 }
 
@@ -1996,7 +1996,7 @@ async function mdLoadFromCoordinates() {
     await mdFetchAndMergeAt(lat, lon, 'koordinaatit');
   } catch(err) {
     mdSetBanner('Kartta ja paikkojen lataus epäonnistui: ' + err.message, 'error');
-    announce('Kartta ja paikkojen lataus epäonnistui.');
+    if (!String(err && err.message || '').includes('Overpass')) announce('Kartta ja paikkojen lataus epäonnistui. ' + (err && err.message ? err.message : ''));
   }
 }
 
@@ -4499,30 +4499,85 @@ if('serviceWorker' in navigator){
       ['tram_stop','station','halt','subway_entrance'].includes(tags.railway));
   }
 
-  const oldQuery = mdOverpassQuery;
+  function mdLoadEnabled(id) {
+    const el = document.getElementById(id);
+    return !!(el && el.checked);
+  }
+
+  function mdAnyLoadCategorySelected() {
+    return [
+      'mdLoadRoadsCb','mdLoadRouteRelationsCb','mdLoadWatersCb','mdLoadOutdoorCb',
+      'mdLoadParkingCb','mdLoadTransitCb','mdLoadStructuresCb','mdLoadLandtypesCb',
+      'mdLoadBarriersCb','mdLoadElevationsCb'
+    ].some(mdLoadEnabled);
+  }
+
+  // Lopullinen Overpass-kysely rakennetaan vain käyttäjän valitsemista aineistotyypeistä.
+  // Tässä ei ole enää vanhaa varatoimintoa, joka haki tiet vaikka kaikki rastit olivat pois.
   mdOverpassQuery = function(lat, lon) {
-    let q = oldQuery(lat, lon);
-    if (!document.getElementById('mdLoadTransitCb') || document.getElementById('mdLoadTransitCb').checked) {
-      const r = typeof mdRadiusMeters === 'function' ? mdRadiusMeters() : MD_RADIUS_M;
-      const extra = `\n  node(around:${r},${lat},${lon})["highway"="bus_stop"];\n  node(around:${r},${lat},${lon})["public_transport"];\n  way(around:${r},${lat},${lon})["public_transport"];\n  relation(around:${r},${lat},${lon})["public_transport"];\n  node(around:${r},${lat},${lon})["amenity"~"^(bus_station|ferry_terminal)$"];\n  way(around:${r},${lat},${lon})["amenity"~"^(bus_station|ferry_terminal)$"];\n  relation(around:${r},${lat},${lon})["amenity"~"^(bus_station|ferry_terminal)$"];\n  node(around:${r},${lat},${lon})["railway"~"^(tram_stop|station|halt|subway_entrance)$"];\n  way(around:${r},${lat},${lon})["railway"~"^(station|halt)$"];\n  relation(around:${r},${lat},${lon})["railway"~"^(station|halt)$"];`;
-      q = q.replace(/\n\);\n\s*out body geom;/, extra + '\n);\nout body geom;');
-    }
-    return q;
+    const r = typeof mdRadiusMeters === 'function' ? mdRadiusMeters() : MD_RADIUS_M;
+    const parts = [];
+
+    if (mdLoadEnabled('mdLoadRoadsCb'))
+      parts.push(`way(around:${r},${lat},${lon})["highway"];`);
+
+    if (mdLoadEnabled('mdLoadRouteRelationsCb'))
+      parts.push(`relation(around:${r},${lat},${lon})["type"="route"]["route"~"^(hiking|foot|walking|bicycle|mtb|ski|horse)$"];`);
+
+    if (mdLoadEnabled('mdLoadWatersCb'))
+      parts.push(`way(around:${r},${lat},${lon})["waterway"]; relation(around:${r},${lat},${lon})["waterway"]; way(around:${r},${lat},${lon})["natural"="water"]; way(around:${r},${lat},${lon})["water"]; relation(around:${r},${lat},${lon})["natural"="water"]; relation(around:${r},${lat},${lon})["water"];`);
+
+    if (mdLoadEnabled('mdLoadOutdoorCb'))
+      parts.push(`node(around:${r},${lat},${lon})["tourism"]; way(around:${r},${lat},${lon})["tourism"]; node(around:${r},${lat},${lon})["amenity"~"^(shelter|bench|toilets|drinking_water)$"]; way(around:${r},${lat},${lon})["amenity"~"^(shelter|bench|toilets|drinking_water)$"]; node(around:${r},${lat},${lon})["leisure"~"^(picnic_table|firepit)$"]; way(around:${r},${lat},${lon})["leisure"~"^(picnic_table|firepit)$"]; node(around:${r},${lat},${lon})["information"]; way(around:${r},${lat},${lon})["information"];`);
+
+    if (mdLoadEnabled('mdLoadParkingCb'))
+      parts.push(`node(around:${r},${lat},${lon})["amenity"="parking"]; way(around:${r},${lat},${lon})["amenity"="parking"]; relation(around:${r},${lat},${lon})["amenity"="parking"];`);
+
+    if (mdLoadEnabled('mdLoadTransitCb'))
+      parts.push(`node(around:${r},${lat},${lon})["highway"="bus_stop"]; node(around:${r},${lat},${lon})["public_transport"="platform"]; node(around:${r},${lat},${lon})["public_transport"="stop_position"]; node(around:${r},${lat},${lon})["public_transport"="station"]; node(around:${r},${lat},${lon})["amenity"="bus_station"]; node(around:${r},${lat},${lon})["amenity"="ferry_terminal"]; node(around:${r},${lat},${lon})["railway"="tram_stop"]; node(around:${r},${lat},${lon})["railway"="station"]; node(around:${r},${lat},${lon})["railway"="halt"]; node(around:${r},${lat},${lon})["railway"="subway_entrance"];`);
+
+    if (mdLoadEnabled('mdLoadStructuresCb'))
+      parts.push(`node(around:${r},${lat},${lon})["building"]; way(around:${r},${lat},${lon})["building"]; node(around:${r},${lat},${lon})["man_made"]; way(around:${r},${lat},${lon})["man_made"]; relation(around:${r},${lat},${lon})["man_made"]; node(around:${r},${lat},${lon})["bridge"]; way(around:${r},${lat},${lon})["bridge"]; relation(around:${r},${lat},${lon})["bridge"];`);
+
+    if (mdLoadEnabled('mdLoadLandtypesCb'))
+      parts.push(`way(around:${r},${lat},${lon})["natural"~"^(wood|scrub|heath|grassland|bare_rock|wetland|cliff)$"]; relation(around:${r},${lat},${lon})["natural"~"^(wood|scrub|heath|grassland|bare_rock|wetland|cliff)$"]; way(around:${r},${lat},${lon})["landuse"~"^(forest|meadow|farmland|grass|orchard|residential|industrial|cemetery)$"]; relation(around:${r},${lat},${lon})["landuse"~"^(forest|meadow|farmland|grass|orchard|residential|industrial|cemetery)$"];`);
+
+    if (mdLoadEnabled('mdLoadBarriersCb'))
+      parts.push(`node(around:${r},${lat},${lon})["barrier"]; way(around:${r},${lat},${lon})["barrier"]; node(around:${r},${lat},${lon})["access"~"^(private|no|permissive|destination)$"]; way(around:${r},${lat},${lon})["access"~"^(private|no|permissive|destination)$"];`);
+
+    if (mdLoadEnabled('mdLoadElevationsCb'))
+      parts.push(`node(around:${r},${lat},${lon})["ele"]; way(around:${r},${lat},${lon})["ele"]; relation(around:${r},${lat},${lon})["ele"];`);
+
+    return `[out:json][timeout:35];\n(\n${parts.join('\n')}\n);\nout body geom;`;
   };
 
   const oldParse = mdParseOverpass;
   mdParseOverpass = function(json) {
     const parsed = oldParse(json);
+
+    // Estä ristikkäistagien kautta syntyvät kohteet pois rastitetuista kategorioista.
+    if (!mdLoadEnabled('mdLoadRoadsCb')) parsed.roads = [];
+    if (!mdLoadEnabled('mdLoadWatersCb')) parsed.waters = [];
+    if (!mdLoadEnabled('mdLoadOutdoorCb')) parsed.outdoor = [];
+    if (!mdLoadEnabled('mdLoadParkingCb')) parsed.parking = [];
+    if (!mdLoadEnabled('mdLoadStructuresCb')) parsed.structures = [];
+    if (!mdLoadEnabled('mdLoadLandtypesCb')) parsed.landtypes = [];
+    if (!mdLoadEnabled('mdLoadBarriersCb')) parsed.barriers = [];
+    if (!mdLoadEnabled('mdLoadElevationsCb')) parsed.elevations = [];
+    if (!mdLoadEnabled('mdLoadRouteRelationsCb')) parsed.routeRelations = [];
+
     const transit = [];
-    const elements = Array.isArray(json && json.elements) ? json.elements : [];
-    for (const el of elements) {
-      const tags = el.tags || {};
-      if (!isTransit(tags)) continue;
-      const baseCoords = mdElementCoords(el);
-      const relParts = el.type === 'relation' ? mdRelationMemberCoords(el) : [];
-      const parts = relParts.length ? relParts : [{coords:baseCoords, suffix:''}];
-      for (const part of parts) if (part.coords && part.coords.length) {
-        mdAddFeature(transit, el, tags, part.coords, 'transit', transitTypeText(tags), part.suffix || '');
+    if (mdLoadEnabled('mdLoadTransitCb')) {
+      const elements = Array.isArray(json && json.elements) ? json.elements : [];
+      for (const el of elements) {
+        const tags = el.tags || {};
+        if (!isTransit(tags)) continue;
+        const baseCoords = mdElementCoords(el);
+        const relParts = el.type === 'relation' ? mdRelationMemberCoords(el) : [];
+        const parts = relParts.length ? relParts : [{coords:baseCoords, suffix:''}];
+        for (const part of parts) if (part.coords && part.coords.length) {
+          mdAddFeature(transit, el, tags, part.coords, 'transit', transitTypeText(tags), part.suffix || '');
+        }
       }
     }
     parsed.transit = transit;
@@ -4611,19 +4666,91 @@ if('serviceWorker' in navigator){
   const oldClear = mdClearData;
   mdClearData = function() { oldClear(); mdState.transit=[]; mdSaveStoredData(); mdUpdateCounts(); };
 
-  // Latauksen onnistumis- ja virheilmoitukset varmasti live-alueelle.
-  const oldFetch = mdFetchAndMergeAt;
+  // Karttatoimintojen oma live-alue pysyy aktiivisena koko alisivulla.
+  let mdLoadAnnounceTimer = null;
+  function mdAnnounceLoad(message) {
+    const el = document.getElementById('mdLoadAnnounce');
+    if (el) {
+      el.textContent = '';
+      clearTimeout(mdLoadAnnounceTimer);
+      mdLoadAnnounceTimer = setTimeout(() => { el.textContent = message; }, 60);
+    }
+    // Säilytetään myös yleinen ilmoitus perusnäkymää ja muita ruudunlukijoita varten.
+    announce(message);
+  }
+
+  // Selkeä lopullinen latausfunktio. Kokeilee varapalvelinta, jos ensisijainen Overpass-palvelin ei vastaa.
   mdFetchAndMergeAt = async function(lat, lon, sourceText) {
+    if (!mdAnyLoadCategorySelected()) {
+      const msg = 'Valitse vähintään yksi ladattava aineistotyyppi.';
+      mdSetBanner(msg, 'error');
+      mdAnnounceLoad(msg);
+      throw new Error(msg);
+    }
+    const radius = typeof mdRadiusMeters === 'function' ? mdRadiusMeters() : MD_RADIUS_M;
+    const radiusText = (radius / 1000).toFixed(radius % 1000 ? 1 : 0);
+    mdSetBanner('Ladataan karttaa ' + radiusText + ' km säteeltä…', 'running');
+    mdAnnounceLoad('Ladataan karttaa ' + radiusText + ' kilometrin säteeltä.');
+
+    const query = mdOverpassQuery(lat, lon);
+    const body = 'data=' + encodeURIComponent(query);
+    const endpoints = [
+      'https://overpass-api.de/api/interpreter',
+      'https://overpass.kumi.systems/api/interpreter',
+      'https://overpass.nchc.org.tw/api/interpreter'
+    ];
+    let json = null;
+    let lastError = null;
+
+    for (const endpoint of endpoints) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45000);
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+          body,
+          signal: controller.signal,
+          cache: 'no-store'
+        });
+        if (!response.ok) throw new Error('Overpass-palvelin palautti virheen ' + response.status);
+        json = await response.json();
+        clearTimeout(timeoutId);
+        break;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        lastError = error;
+      }
+    }
+
+    if (!json) {
+      const reason = lastError && lastError.name === 'AbortError'
+        ? 'Overpass-palvelimen vastaus aikakatkaistiin.'
+        : (lastError && lastError.message ? lastError.message : 'Overpass-palveluun ei saatu yhteyttä.');
+      mdSetBanner('Kartan lataus epäonnistui: ' + reason, 'error');
+      mdAnnounceLoad('Kartan lataus epäonnistui. ' + reason);
+      throw new Error(reason);
+    }
+
     try {
-      const before = (mdState.transit || []).length;
-      const result = await oldFetch(lat, lon, sourceText);
-      const addedTransit = Math.max(0, (mdState.transit || []).length - before);
-      const msg = addedTransit ? 'Kartta lisätty. Joukkoliikennekohteita lisättiin ' + addedTransit + '.' : 'Kartta lisätty.';
-      announce(msg);
-      return result;
-    } catch(e) {
-      announce('Kartan lataus epäonnistui. ' + (e && e.message ? e.message : 'Tuntematon virhe.'));
-      throw e;
+      const parsed = mdParseOverpass(json);
+      const merged = mdMergeParsedData(parsed, { lat, lon, radius, source: sourceText || 'haku' });
+      const total = (merged.addedRoads || 0) + (merged.addedWaters || 0) +
+        (merged.addedOutdoor || 0) + (merged.addedParking || 0) +
+        (merged.addedTransit || 0) + (merged.addedStructures || 0) +
+        (merged.addedLandtypes || 0) + (merged.addedBarriers || 0) +
+        (merged.addedElevations || 0) + (merged.addedRouteRelations || 0);
+      const transitCount = merged.addedTransit || 0;
+      const message = 'Kartta lisätty. Uusia kohteita ' + total +
+        (transitCount ? ', joista joukkoliikennekohteita ' + transitCount : '') + '.';
+      mdSetBanner(message, 'idle');
+      mdAnnounceLoad(message);
+      return merged;
+    } catch (error) {
+      const reason = error && error.message ? error.message : 'Vastauksen käsittely epäonnistui.';
+      mdSetBanner('Kartan lataus epäonnistui: ' + reason, 'error');
+      mdAnnounceLoad('Kartan lataus epäonnistui. ' + reason);
+      throw error;
     }
   };
 
