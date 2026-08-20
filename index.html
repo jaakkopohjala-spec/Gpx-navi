@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="GPX">
 <link rel="manifest" href="manifest.json">
-<title>GPX-sovellus 6.8.2026 – joukkoliikenne</title>
+<title>GPX-sovellus 20.8.2026 </title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -695,9 +695,13 @@ function getSpeechRate() {
   return Math.max(0.7,Math.min(2.0,Number(inp ? inp.value : 110)/100));
 }
 
-/* === AUDIO: iOS-yhteensopiva alustus === */
+/* === AUDIO: iOS + Android -yhteensopiva alustus === */
 let audioCtx = null;
 let speechReady = false;
+let preferredFinnishVoice = null;
+const uaString = navigator.userAgent || '';
+const isAndroidBrowser = /Android/i.test(uaString);
+const isIOSBrowser = /iPad|iPhone|iPod/i.test(uaString) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
 function ensureAudio() {
   if (!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
@@ -705,11 +709,47 @@ function ensureAudio() {
   return audioCtx;
 }
 
+function refreshSpeechVoices() {
+  if (!window.speechSynthesis || typeof speechSynthesis.getVoices !== 'function') return;
+  const voices = speechSynthesis.getVoices() || [];
+  preferredFinnishVoice = voices.find(v => /^fi([-_]|$)/i.test(v.lang || '')) ||
+                          voices.find(v => /finnish|suomi/i.test((v.name || '') + ' ' + (v.lang || ''))) ||
+                          null;
+}
+
+function applyPreferredSpeechVoice(u) {
+  if (!u) return;
+  refreshSpeechVoices();
+  if (preferredFinnishVoice) {
+    u.voice = preferredFinnishVoice;
+    u.lang = preferredFinnishVoice.lang || 'fi-FI';
+  } else {
+    // Androidissa käytetään järjestelmän oletusääntä, jos suomen ääntä ei ole saatavilla.
+    // iOS:ssa säilytetään aiempi fi-FI-käytös.
+    if (!isAndroidBrowser) u.lang = 'fi-FI';
+  }
+}
+
+if (window.speechSynthesis) {
+  refreshSpeechVoices();
+  if ('onvoiceschanged' in speechSynthesis) {
+    speechSynthesis.addEventListener('voiceschanged', refreshSpeechVoices);
+  }
+}
+
 function primeSpeech() {
   if (!window.speechSynthesis || speechReady) return;
-  speechReady = true; // merkitään heti, jotta ei kutsuta kahteen kertaan
-  const u = new SpeechSynthesisUtterance('​'); // nolla-leveyden välilyönti
-  u.volume = 0.001;  // iOS vaatii > 0 volumen
+  speechReady = true;
+
+  // Tyhjä priming-lausuma tarvitaan iOS/Safarissa, mutta Android/Chrome voi
+  // jäädä sen jälkeen hiljaiseen tai jumittuneeseen puhetilaan.
+  if (!isIOSBrowser) {
+    refreshSpeechVoices();
+    return;
+  }
+
+  const u = new SpeechSynthesisUtterance('​');
+  u.volume = 0.001;
   u.lang = 'fi-FI';
   u.rate = 1.1;
   speechSynthesis.speak(u);
@@ -720,15 +760,21 @@ function warmUpAudio() {
   primeSpeech();
 }
 
-// Käytetään GPS-napin painalluksen yhteydessä: varmistaa että iOS-puhe toimii
+// GPS-käynnistyksessä iOS nollataan ja primetaan kuten ennen.
+// Androidissa ei tehdä cancel()+tyhjä lausuma -yhdistelmää.
 function warmUpAudioForGps() {
   try { ensureAudio(); } catch(e) {}
-  // Nollataan tila ja primetaan uudelleen aina GPS-käynnistyksessä
-  if (window.speechSynthesis) {
+  if (isIOSBrowser && window.speechSynthesis) {
     try { window.speechSynthesis.cancel(); } catch(e) {}
+    speechReady = false;
+    primeSpeech();
+    return;
   }
-  speechReady = false;
-  primeSpeech();
+  speechReady = true;
+  refreshSpeechVoices();
+  if (window.speechSynthesis && window.speechSynthesis.paused) {
+    try { window.speechSynthesis.resume(); } catch(e) {}
+  }
 }
 
 document.addEventListener('touchstart', warmUpAudio, { passive:true });
@@ -1445,43 +1491,82 @@ function mdSetWaterBox(msg, state) {
   mdWaterStatus.dataset.state = state || '';
 }
 
-// md-puhejono — iOS-yhteensopiva (kuten navSpeak)
-const mdSpeechState = { queue: [], speaking: false };
+// md-puhejono — iOS- ja Android-yhteensopiva
+const mdSpeechState = { queue: [], speaking: false, currentToken: 0 };
+
+function mdRecoverAndroidSpeech() {
+  if (!isAndroidBrowser || !window.speechSynthesis) return;
+  try {
+    if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+  } catch(e) {}
+}
 
 function processMdSpeechQueue() {
   if (mdSpeechState.speaking || !mdSpeechState.queue.length || !window.speechSynthesis) return;
   const item = mdSpeechState.queue.shift();
   mdSpeechState.speaking = true;
+  const token = ++mdSpeechState.currentToken;
+
   const speakNow = () => {
+    if (token !== mdSpeechState.currentToken) return;
     const u = new SpeechSynthesisUtterance(item.text);
-    u.lang = 'fi-FI';
+    applyPreferredSpeechVoice(u);
     u.rate = 1.1;
-    // iOS watchdog: jos onend ei tule 15s sisällä, nollataan tila
+
+    let started = false;
+    u.onstart = () => { started = true; };
+
+    // iOS watchdog ja Android Chrome -jumisuojus.
     const watchdog = setTimeout(() => {
+      if (token !== mdSpeechState.currentToken) return;
       mdSpeechState.speaking = false;
-      processMdSpeechQueue();
-    }, 15000);
-    u.onend = u.onerror = () => {
+      if (isAndroidBrowser && !started) {
+        try { window.speechSynthesis.cancel(); } catch(e) {}
+        setTimeout(() => {
+          try { window.speechSynthesis.resume(); } catch(e) {}
+          processMdSpeechQueue();
+        }, 180);
+      } else {
+        processMdSpeechQueue();
+      }
+    }, isAndroidBrowser ? 5000 : 15000);
+
+    u.onend = () => {
+      clearTimeout(watchdog);
+      if (token !== mdSpeechState.currentToken) return;
+      mdSpeechState.speaking = false;
+      setTimeout(processMdSpeechQueue, isAndroidBrowser ? 140 : 80);
+    };
+
+    u.onerror = (event) => {
+      clearTimeout(watchdog);
+      if (token !== mdSpeechState.currentToken) return;
+      console.warn('[Puhe] speechSynthesis-virhe:', event && event.error ? event.error : event);
+      mdSpeechState.speaking = false;
+      if (isAndroidBrowser) mdRecoverAndroidSpeech();
+      setTimeout(processMdSpeechQueue, 180);
+    };
+
+    try {
+      if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+      speechSynthesis.speak(u);
+    } catch(e) {
       clearTimeout(watchdog);
       mdSpeechState.speaking = false;
-      setTimeout(processMdSpeechQueue, 80);
-    };
-    // iOS: tarkistetaan että synteesi ei ole pysähtynyt
-    if (window.speechSynthesis.paused) window.speechSynthesis.resume();
-    speechSynthesis.speak(u);
+      console.warn('[Puhe] Lausuman käynnistys epäonnistui:', e);
+      setTimeout(processMdSpeechQueue, 180);
+    }
   };
-  if (item.delay) {
-    setTimeout(speakNow, item.delay);
-  } else {
-    speakNow();
-  }
+
+  if (item.delay) setTimeout(speakNow, item.delay);
+  else speakNow();
 }
 
 function mdSpeak(text, delay) {
   if (!window.speechSynthesis || !text) return;
-  // iOS: jos puhesynteesi on pysähtynyt, yritetään elvyttää se
-  if (window.speechSynthesis.paused) {
-    window.speechSynthesis.resume();
+  if (isAndroidBrowser) mdRecoverAndroidSpeech();
+  else if (window.speechSynthesis.paused) {
+    try { window.speechSynthesis.resume(); } catch(e) {}
   }
   mdSpeechState.queue.push({ text, delay: delay || 0 });
   processMdSpeechQueue();
