@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="GPX">
 <link rel="manifest" href="manifest.json">
-<title>GPX-sovellus 20.8.2026 </title>
+<title>GPX-sovellus 10.9.2026 – puhekorjaukset</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -576,7 +576,7 @@ body { display:flex; flex-direction:column; min-height:100dvh; }
   </div>
 
   <div class="full-view" id="mdNotificationsPanel" style="display:none" role="region" aria-label="Ilmoitukset">
-    <div class="view-inner"><div class="view-header"><button class="btn btn-yellow back-btn" type="button" data-back>Takaisin</button><span class="view-title">Ilmoitukset</span></div><p class="hint">Valinta määrää, mistä kategorioista annetaan automaattinen 15 metrin puheilmoitus. Tiet ja polut sekä GPX vaikuttavat myös reitillä/poissa reitiltä -ilmoituksiin.</p><div class="check-group" role="radiogroup" aria-label="Suuntaohjeiden tapa"><label class="check-row"><input type="radio" name="mdDirectionMode" id="mdDirectionCardinal" value="cardinal" checked><span>Ilmansuunnat</span></label><label class="check-row"><input type="radio" name="mdDirectionMode" id="mdDirectionClock" value="clock"><span>Kellotaulu</span></label></div><div class="check-group compact-checks" role="group" aria-label="Reitti- ja liikkumissuunnan ilmoitukset"><label class="check-row"><input type="checkbox" id="mdUserDirCb"><span>Kerro oma liikkumissuunta</span></label><label class="check-row"><input type="checkbox" id="mdRouteDirCb"><span>Kerro reitin kulkusuunta</span></label></div><div class="check-group" role="group" aria-label="Ilmoitettavat kategoriat"><label class="check-row"><input type="checkbox" id="mdOwnPlacesCb" checked><span>Omat paikat</span></label><label class="check-row"><input type="checkbox" id="mdGpxCb"><span>GPX</span></label><label class="check-row"><input type="checkbox" id="mdRoadsCb" checked><span>Tiet ja polut</span></label><label class="check-row"><input type="checkbox" id="mdWaterCb" checked><span>Vesistöt</span></label><label class="check-row"><input type="checkbox" id="mdOutdoorCb" checked><span>Retkeilykohteet</span></label><label class="check-row"><input type="checkbox" id="mdParkingCb"><span>Pysäköinti</span></label><label class="check-row"><input type="checkbox" id="mdTransitCb"><span>Joukkoliikenne</span></label><label class="check-row"><input type="checkbox" id="mdStructuresCb"><span>Rakennukset ja rakenteet</span></label><label class="check-row"><input type="checkbox" id="mdLandtypesCb"><span>Maastotyypit</span></label><label class="check-row"><input type="checkbox" id="mdBarriersCb"><span>Esteet ja rajoitukset</span></label><label class="check-row"><input type="checkbox" id="mdElevationsCb"><span>Korkeustagit</span></label></div></div>
+    <div class="view-inner"><div class="view-header"><button class="btn btn-yellow back-btn" type="button" data-back>Takaisin</button><span class="view-title">Ilmoitukset</span></div><p class="hint">Valinta määrää, mistä kategorioista annetaan automaattinen 15 metrin puheilmoitus. Tiet ja polut sekä GPX vaikuttavat myös reitillä/poissa reitiltä -ilmoituksiin.</p><div class="check-group" role="radiogroup" aria-label="Suuntaohjeiden tapa"><label class="check-row"><input type="radio" name="mdDirectionMode" id="mdDirectionCardinal" value="cardinal" checked><span>Ilmansuunnat</span></label><label class="check-row"><input type="radio" name="mdDirectionMode" id="mdDirectionClock" value="clock"><span>Kellotaulu</span></label></div><div class="check-group compact-checks" role="group" aria-label="Reitti- ja liikkumissuunnan ilmoitukset"><label class="check-row"><input type="checkbox" id="mdUserDirCb"><span>Kerro oma liikkumissuunta</span></label><label class="check-row"><input type="checkbox" id="mdRouteDirCb"><span>Kerro reitin kulkusuunta</span></label><label class="check-row"><input type="checkbox" id="talkBackMode" aria-describedby="talkBackModeHint"><span>Käytän TalkBackia</span></label><span id="talkBackModeHint" class="hint">TalkBack lukee puheilmoitukset sovelluksen oman puheen sijaan.</span></div><div class="check-group" role="group" aria-label="Ilmoitettavat kategoriat"><label class="check-row"><input type="checkbox" id="mdOwnPlacesCb" checked><span>Omat paikat</span></label><label class="check-row"><input type="checkbox" id="mdGpxCb"><span>GPX</span></label><label class="check-row"><input type="checkbox" id="mdRoadsCb" checked><span>Tiet ja polut</span></label><label class="check-row"><input type="checkbox" id="mdWaterCb" checked><span>Vesistöt</span></label><label class="check-row"><input type="checkbox" id="mdOutdoorCb" checked><span>Retkeilykohteet</span></label><label class="check-row"><input type="checkbox" id="mdParkingCb"><span>Pysäköinti</span></label><label class="check-row"><input type="checkbox" id="mdTransitCb"><span>Joukkoliikenne</span></label><label class="check-row"><input type="checkbox" id="mdStructuresCb"><span>Rakennukset ja rakenteet</span></label><label class="check-row"><input type="checkbox" id="mdLandtypesCb"><span>Maastotyypit</span></label><label class="check-row"><input type="checkbox" id="mdBarriersCb"><span>Esteet ja rajoitukset</span></label><label class="check-row"><input type="checkbox" id="mdElevationsCb"><span>Korkeustagit</span></label></div></div>
   </div>
 
   <div class="full-view" id="mdNearestPanel" style="display:none" role="region" aria-label="Lähimmät kohteet"><div class="view-inner"><div class="view-header"><button class="btn btn-yellow back-btn" type="button" data-back>Takaisin</button><span class="view-title" id="mdNearestTitle">Lähimmät</span></div><div id="mdNearestList" class="nearest-list" role="list"><p class="places-empty" id="mdNearestEmpty">Ei kohteita.</p></div><button class="btn btn-blue" id="mdNearestMoreBtn" style="display:none">Näytä lisää</button></div></div>
@@ -853,13 +853,159 @@ document.addEventListener('visibilitychange',async()=>{
     await acquireWakeLock();
 });
 
+/* =====================================================
+   YHTENÄINEN PUHEMOOTTORI
+   Kaikki sovelluksen puheilmoitukset (Seuranta, Kartta ja paikat,
+   Tallennin) kulkevat tästä yhdestä jonosta, jotta ne eivät
+   Androidilla kilpaile keskenään samasta puhekanavasta.
+   ===================================================== */
+const SPEECH_STALE_MS = 9000; // jos ilmoitus on odottanut jonossa tätä kauemmin, se voi olla vanhentunut
+const TALKBACK_MODE_KEY = 'gpxTalkBackMode';
+
+const speechEngine = { queue: [], speaking: false, currentToken: 0, keepAliveTimer: null };
+
+function getTalkBackMode() {
+  try { return localStorage.getItem(TALKBACK_MODE_KEY) === '1'; } catch(e) { return false; }
+}
+function setTalkBackMode(on) {
+  try { localStorage.setItem(TALKBACK_MODE_KEY, on ? '1' : '0'); } catch(e) {}
+}
+
+// Karkea arvio lausuman kestosta (millisekuntia), koska "onstart" ei
+// laukea luotettavasti kaikilla Android-puhemoottoreilla eikä watchdog
+// silloin voi luottaa siihen.
+function estimateSpeechMs(text, rate) {
+  const chars = (text || '').length;
+  const perCharMs = 90 / Math.max(0.5, rate || 1);
+  return Math.min(20000, Math.max(1500, chars * perCharMs)) + 1800;
+}
+
+// Chrome/Android-bugi: pitkään auki ollut speechSynthesis voi hiljalleen
+// "kuolla" ilman virhettä. Jaksottainen pause()+resume() pitää sen hengissä.
+function startSpeechKeepAlive() {
+  if (speechEngine.keepAliveTimer || !window.speechSynthesis) return;
+  speechEngine.keepAliveTimer = setInterval(() => {
+    try {
+      if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+        window.speechSynthesis.pause();
+        window.speechSynthesis.resume();
+      }
+    } catch(e) {}
+  }, 5000);
+}
+startSpeechKeepAlive();
+
+function clearSpeechQueue() {
+  speechEngine.queue = [];
+  speechEngine.speaking = false;
+  speechEngine.currentToken++;
+  if (window.speechSynthesis) { try { speechSynthesis.cancel(); } catch(e) {} }
+}
+
+function processSpeechEngine() {
+  if (speechEngine.speaking || !speechEngine.queue.length || !window.speechSynthesis) return;
+  const item = speechEngine.queue.shift();
+
+  if (item.dropIfStale && (Date.now() - item.addedAt) > SPEECH_STALE_MS) {
+    setTimeout(processSpeechEngine, 0);
+    return;
+  }
+
+  speechEngine.speaking = true;
+  const token = ++speechEngine.currentToken;
+
+  const speakNow = () => {
+    if (token !== speechEngine.currentToken) return;
+    const u = new SpeechSynthesisUtterance(item.text);
+    applyPreferredSpeechVoice(u);
+    u.rate = item.rate;
+
+    let started = false;
+    u.onstart = () => { started = true; };
+
+    const estMs = estimateSpeechMs(item.text, item.rate);
+    const watchdog = setTimeout(() => {
+      if (token !== speechEngine.currentToken) return;
+      speechEngine.speaking = false;
+      if (isAndroidBrowser && !started) {
+        try { window.speechSynthesis.cancel(); } catch(e) {}
+        setTimeout(() => { try { window.speechSynthesis.resume(); } catch(e) {} processSpeechEngine(); }, 180);
+      } else {
+        processSpeechEngine();
+      }
+    }, estMs);
+
+    u.onend = () => {
+      clearTimeout(watchdog);
+      if (token !== speechEngine.currentToken) return;
+      speechEngine.speaking = false;
+      setTimeout(processSpeechEngine, isAndroidBrowser ? 140 : 80);
+    };
+
+    u.onerror = (event) => {
+      clearTimeout(watchdog);
+      if (token !== speechEngine.currentToken) return;
+      const errType = event && event.error;
+      console.warn('[Puhe] speechSynthesis-virhe:', errType || event);
+      speechEngine.speaking = false;
+      // TalkBack tai muu järjestelmän puhe keskeytti lausuman — yritetään
+      // uudelleen muutaman kerran sen sijaan että ilmoitus katoaa hiljaa.
+      const interrupted = errType === 'interrupted' || errType === 'canceled';
+      if (interrupted && (item.retries || 0) < 2) {
+        item.retries = (item.retries || 0) + 1;
+        item.addedAt = Date.now();
+        speechEngine.queue.unshift(item);
+      }
+      if (isAndroidBrowser) {
+        try { if (window.speechSynthesis.paused) window.speechSynthesis.resume(); } catch(e) {}
+      }
+      setTimeout(processSpeechEngine, 180);
+    };
+
+    try {
+      if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+      speechSynthesis.speak(u);
+    } catch(e) {
+      clearTimeout(watchdog);
+      speechEngine.speaking = false;
+      console.warn('[Puhe] Lausuman käynnistys epäonnistui:', e);
+      setTimeout(processSpeechEngine, 180);
+    }
+  };
+
+  if (item.delay) setTimeout(speakNow, item.delay);
+  else speakNow();
+}
+
+function queueSpeech(text, opts) {
+  opts = opts || {};
+  if (!text) return;
+
+  // Jos käyttäjä on kertonut käyttävänsä TalkBackia, luotetaan sen omaan
+  // puheeseen aria-live-alueen kautta. Kahden puhekanavan yhtäaikainen
+  // käyttö saa Androidilla ne katkaisemaan toisensa.
+  if (getTalkBackMode()) {
+    announce(text);
+    return;
+  }
+
+  if (!window.speechSynthesis) return;
+  if (opts.force) clearSpeechQueue();
+
+  speechEngine.queue.push({
+    text,
+    delay: opts.delay || 0,
+    rate: opts.rate || getSpeechRate(),
+    dropIfStale: opts.dropIfStale !== false,
+    addedAt: Date.now(),
+    retries: 0
+  });
+  processSpeechEngine();
+}
+
 /* === Generic speak helper (used by Paikat and Tallennin direction) === */
 function speakAt110(text) {
-  if (!window.speechSynthesis || !text) return;
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = 'fi-FI';
-  u.rate = 1.1;
-  speechSynthesis.speak(u);
+  queueSpeech(text, { rate: 1.1, dropIfStale: true });
 }
 
 /* =====================================================
@@ -872,9 +1018,7 @@ const navState = {
   lastTurnMsg:'', lastAnnouncedTurnIdx:-1,
   lastForward:null,
   lastRouteAxis:'', lastUserDir:'',
-  routePoints:[],
-  speechQueue:[], speaking:false,
-  lastSpokenAt:0
+  routePoints:[]
 };
 
 const gpxFileInput    = document.getElementById('gpxFile');
@@ -902,6 +1046,15 @@ const navBannerTxt    = document.getElementById('navBannerText');
 const navToggleBtn    = document.getElementById('navToggle');
 const navToggleLbl    = document.getElementById('navToggleLabel');
 
+const talkBackModeCb = document.getElementById('talkBackMode');
+if (talkBackModeCb) {
+  talkBackModeCb.checked = getTalkBackMode();
+  talkBackModeCb.addEventListener('change', () => {
+    setTalkBackMode(talkBackModeCb.checked);
+    clearSpeechQueue();
+  });
+}
+
 showRouteDirCb.addEventListener('change',()=>{ routeDirStat.style.display=showRouteDirCb.checked?'':'none'; });
 showUserDirCb.addEventListener('change',()=>{ userDirStat.style.display=showUserDirCb.checked?'':'none'; });
 announceTurnsCb.addEventListener('change',()=>{
@@ -923,7 +1076,6 @@ gpxFileInput.addEventListener('change',async e=>{
     if(!navState.routePoints.length) throw new Error('Ei kelvollisia pisteit\u00e4.');
     navPtsEl.textContent=navState.routePoints.length;
     navSetBanner('GPX ladattu \u2013 '+navState.routePoints.length+' pistett\u00e4.','idle');
-    announce('GPX ladattu. '+navState.routePoints.length+' pistett\u00e4.');
     navSpeak('GPX ladattu. '+navState.routePoints.length+' pistett\u00e4.',true);
   } catch(err) {
     navSetBanner('Virhe: '+err.message,'error');
@@ -938,33 +1090,11 @@ function navSetRouteBox(msg,state) {
   routeStatusEl.textContent=msg; routeStatusEl.dataset.state=state||'';
 }
 
-function processSpeechQueue() {
-  if (navState.speaking || !navState.speechQueue.length || !window.speechSynthesis) return;
-  const item = navState.speechQueue.shift();
-  navState.speaking = true;
-
-  setTimeout(() => {
-    const u = new SpeechSynthesisUtterance(item.text);
-    u.lang = 'fi-FI';
-    u.rate = getSpeechRate();
-    u.onend = u.onerror = () => {
-      navState.speaking = false;
-      navState.lastSpokenAt = Date.now();
-      setTimeout(processSpeechQueue, 120);
-    };
-    speechSynthesis.speak(u);
-  }, item.delay || 0);
-}
-
 function navSpeak(text, force, delay) {
-  if (!window.speechSynthesis || !text) return;
-  if (force) {
-    navState.speechQueue = [];
-    navState.speaking = false;
-    speechSynthesis.cancel();
-  }
-  navState.speechQueue.push({ text, delay: delay || 0 });
-  processSpeechQueue();
+  // "force" katkaisee käynnissä olevan puheen (esim. seurannan käynnistys/pysäytys);
+  // muuten viesti hylätään hiljaa jos se ehtii vanhentua jonossa (esim. poissa
+  // reitiltä -ilmoitus, joka ei enää pidä paikkaansa parin sekunnin viiveellä).
+  queueSpeech(text, { force: !!force, delay: delay || 0, dropIfStale: !force });
 }
 
 function maybeRouteAudio(isOnRoute, distanceText, directionText) {
@@ -1139,7 +1269,6 @@ function handleNavPosition(pos) {
         navTurnEl.textContent=turn.msg;
         if(turn.turnIdx!==navState.lastAnnouncedTurnIdx){
           navSpeak(turn.msg);
-          announce(turn.msg);
           navState.lastAnnouncedTurnIdx=turn.turnIdx;
         }
         navState.lastTurnMsg=turn.msg;
@@ -1184,8 +1313,7 @@ async function navStart(){
   navState.lastForward=null;
   navState.lastRouteAxis='';
   navState.lastUserDir='';
-  navState.speechQueue=[];
-  navState.speaking=false;
+  clearSpeechQueue();
   navState.running=true;
   warmUpAudio();
   navState.watchId=navigator.geolocation.watchPosition(
@@ -1199,22 +1327,18 @@ async function navStart(){
   navToggleBtn.setAttribute('aria-pressed','true');
   navToggleBtn.setAttribute('aria-label','Lopeta reittiseuranta');
   navSetBanner('Seuranta k\u00e4ynniss\u00e4.','running');
-  announce('Seuranta k\u00e4ynnistetty.');
   navSpeak('Seuranta k\u00e4ynnistetty.',true);
 }
 
 function navStop(){
   navigator.geolocation.clearWatch(navState.watchId);
   navState.running=false; maybeReleaseLock();
-  navState.speechQueue=[];
-  navState.speaking=false;
-  if(window.speechSynthesis) speechSynthesis.cancel();
+  clearSpeechQueue();
   navToggleLbl.textContent='Aloita seuranta';
   navToggleBtn.className='btn btn-green';
   navToggleBtn.setAttribute('aria-pressed','false');
   navToggleBtn.setAttribute('aria-label','Aloita reittiseuranta');
   navSetBanner('Seuranta pys\u00e4ytetty.','idle');
-  announce('Seuranta pys\u00e4ytetty.');
   navSpeak('Seuranta pys\u00e4ytetty.',true);
 }
 
@@ -1491,85 +1615,10 @@ function mdSetWaterBox(msg, state) {
   mdWaterStatus.dataset.state = state || '';
 }
 
-// md-puhejono — iOS- ja Android-yhteensopiva
-const mdSpeechState = { queue: [], speaking: false, currentToken: 0 };
-
-function mdRecoverAndroidSpeech() {
-  if (!isAndroidBrowser || !window.speechSynthesis) return;
-  try {
-    if (window.speechSynthesis.paused) window.speechSynthesis.resume();
-  } catch(e) {}
-}
-
-function processMdSpeechQueue() {
-  if (mdSpeechState.speaking || !mdSpeechState.queue.length || !window.speechSynthesis) return;
-  const item = mdSpeechState.queue.shift();
-  mdSpeechState.speaking = true;
-  const token = ++mdSpeechState.currentToken;
-
-  const speakNow = () => {
-    if (token !== mdSpeechState.currentToken) return;
-    const u = new SpeechSynthesisUtterance(item.text);
-    applyPreferredSpeechVoice(u);
-    u.rate = 1.1;
-
-    let started = false;
-    u.onstart = () => { started = true; };
-
-    // iOS watchdog ja Android Chrome -jumisuojus.
-    const watchdog = setTimeout(() => {
-      if (token !== mdSpeechState.currentToken) return;
-      mdSpeechState.speaking = false;
-      if (isAndroidBrowser && !started) {
-        try { window.speechSynthesis.cancel(); } catch(e) {}
-        setTimeout(() => {
-          try { window.speechSynthesis.resume(); } catch(e) {}
-          processMdSpeechQueue();
-        }, 180);
-      } else {
-        processMdSpeechQueue();
-      }
-    }, isAndroidBrowser ? 5000 : 15000);
-
-    u.onend = () => {
-      clearTimeout(watchdog);
-      if (token !== mdSpeechState.currentToken) return;
-      mdSpeechState.speaking = false;
-      setTimeout(processMdSpeechQueue, isAndroidBrowser ? 140 : 80);
-    };
-
-    u.onerror = (event) => {
-      clearTimeout(watchdog);
-      if (token !== mdSpeechState.currentToken) return;
-      console.warn('[Puhe] speechSynthesis-virhe:', event && event.error ? event.error : event);
-      mdSpeechState.speaking = false;
-      if (isAndroidBrowser) mdRecoverAndroidSpeech();
-      setTimeout(processMdSpeechQueue, 180);
-    };
-
-    try {
-      if (window.speechSynthesis.paused) window.speechSynthesis.resume();
-      speechSynthesis.speak(u);
-    } catch(e) {
-      clearTimeout(watchdog);
-      mdSpeechState.speaking = false;
-      console.warn('[Puhe] Lausuman käynnistys epäonnistui:', e);
-      setTimeout(processMdSpeechQueue, 180);
-    }
-  };
-
-  if (item.delay) setTimeout(speakNow, item.delay);
-  else speakNow();
-}
-
+// Kartta ja paikat -tilan puheilmoitukset kulkevat samasta yhtenäisestä
+// puhemoottorista kuin Seuranta, jotta ne eivät kilpaile keskenään.
 function mdSpeak(text, delay) {
-  if (!window.speechSynthesis || !text) return;
-  if (isAndroidBrowser) mdRecoverAndroidSpeech();
-  else if (window.speechSynthesis.paused) {
-    try { window.speechSynthesis.resume(); } catch(e) {}
-  }
-  mdSpeechState.queue.push({ text, delay: delay || 0 });
-  processMdSpeechQueue();
+  queueSpeech(text, { delay: delay || 0, rate: 1.1, dropIfStale: true });
 }
 
 function mdUpdateCounts() {
@@ -3107,8 +3156,7 @@ mdGpsToggle.addEventListener('click', async () => {
     mdState.ownPlaceInside = {};
     mdState.categoryInside = {};
     delete mdState.waterProximityInside;
-    mdSpeechState.queue = [];
-    mdSpeechState.speaking = false;
+    clearSpeechQueue();
     mdState.watchId = navigator.geolocation.watchPosition(
       mdHandlePosition,
       err => { mdSetBanner('GPS-virhe: ' + err.message, 'error'); announce('GPS-virhe.'); },
@@ -3124,9 +3172,7 @@ mdGpsToggle.addEventListener('click', async () => {
   } else {
     navigator.geolocation.clearWatch(mdState.watchId);
     mdState.running = false;
-    mdSpeechState.queue = [];
-    mdSpeechState.speaking = false;
-    if (window.speechSynthesis) { speechSynthesis.cancel(); }
+    clearSpeechQueue();
     speechReady = false;
     maybeReleaseLock();
     mdGpsLabel.textContent = 'Aloita GPS-seuranta';
